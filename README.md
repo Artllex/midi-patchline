@@ -4,7 +4,9 @@ Natywna aplikacja Windows w C# / WPF do zarządzania routingiem MIDI i presetami
 
 ## Aktualny stan
 
-Wersja 0.1.68 jest działającym prototypem interfejsu. Obsługuje wybór źródeł i odbiorców, pojedyncze i wielokrotne przypisania, transpozycję oktawową, tagi, ukrywanie instrumentów, grafiki oraz zapis i przywoływanie presetów. Dostępna jest lista portów MIDI systemu Windows.
+Wersja 0.1.99 jest działającym prototypem interfejsu. Obsługuje wybór źródeł i odbiorców, pojedyncze i wielokrotne przypisania, transpozycję oktawową, tagi, ukrywanie instrumentów, grafiki oraz zapis i przywoływanie presetów. Dostępna jest lista portów MIDI systemu Windows.
+
+Dodano wyszukiwanie źródeł i odbiorców, tryb wielu odbiorców z CTRL, tymczasowe Solo, typy źródeł z profilami klawiatur oraz edytor Split. Profile Split zawierają warstwy z zakresami nut lub parametrów MIDI, osobnymi odbiorcami i transpozycją. Sceny można przypinać i usuwać przez menu kontekstowe obsługujące również przytrzymanie dotykiem.
 
 Przesyłanie komunikatów MIDI oraz PANIC są obecnie symulowane.
 

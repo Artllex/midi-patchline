@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -6,7 +6,15 @@ namespace MidiRouter;
 public partial class MainWindow : Window
 {
  public RouterViewModel Model {get;}=new();
- public MainWindow(){InitializeComponent();DataContext=Model;Closing+=(_,_)=>Model.Save();Loaded+=(_,_)=>RestoreSectionOrder();}
+ public MainWindow(){InitializeComponent();DataContext=Model;
+ PreviewKeyDown+=(_,_)=>UpdateControlSelection();
+ PreviewKeyUp+=(_,_)=>UpdateControlSelection();
+ Activated+=(_,_)=>UpdateControlSelection();
+ Deactivated+=(_,_)=>Model.SetControlSelection(false);
+ Model.PropertyChanged+=(_,args)=>{if(args.PropertyName=="ActiveCard"&&SplitHost.Visibility==Visibility.Visible){Model.CloseSplit();SplitHost.Content=null;SplitHost.Visibility=Visibility.Collapsed;MainRouting.Visibility=Visibility.Visible;}};
+
+Closing+=(_,_)=>Model.Save();Loaded+=(_,_)=>RestoreSectionOrder();}
+ private void UpdateControlSelection()=>Model.SetControlSelection((Keyboard.Modifiers&ModifierKeys.Control)!=0);
  private readonly DispatcherTimer wheelTimer=new(){Interval=TimeSpan.FromMilliseconds(16)};
  private ScrollViewer? wheelViewer;private double wheelTarget;private long wheelLastTick;
  private void SmoothWheel(object sender,MouseWheelEventArgs e){
@@ -109,8 +117,56 @@ public partial class MainWindow : Window
   else if(item is Receiver receiver){var endpoints=Model.State.Endpoints.Select(x=>x.Copy()).ToList();endpoints.Single(x=>x.Id==receiver.Endpoint.Id).Name=item.DraftName.Trim();Model.CommitSettings(endpoints,new());}
   item.CancelRename();
  }
+ private List<Route>? receiverClickSnapshot;
+ private string? clickSource,clickCard;
+ private Receiver? clickReceiver;
+ private void ReceiverClick(object sender,RoutedEventArgs e){
+  if(sender is FrameworkElement{DataContext:Receiver receiver})Model.ToggleReceiver.Execute(receiver);
+ }
+ private void ReceiverMouseDown(object sender,MouseButtonEventArgs e){
+  if(sender is not FrameworkElement{DataContext:Receiver receiver})return;
+  if(e.ClickCount==2){
+   if(receiverClickSnapshot!=null&&clickReceiver==receiver&&clickSource==Model.State.SelectedSourceId&&clickCard==Model.State.ActiveCardId)
+    Model.RestoreClickRoutes(receiverClickSnapshot);
+   receiverClickSnapshot=null;Model.ToggleSolo(receiver);e.Handled=true;return;
+  }
+  receiverClickSnapshot=Model.EditingRoutes.Select(route=>new Route{SourceId=route.SourceId,ReceiverId=route.ReceiverId,Octaves=route.Octaves}).ToList();
+  clickSource=Model.State.SelectedSourceId;clickCard=Model.State.ActiveCardId;clickReceiver=receiver;
+ }
+ private void OpenSplit(Source source){
+  Model.EditSplit(source);MainRouting.Visibility=Visibility.Collapsed;SplitHost.Visibility=Visibility.Visible;
+  SplitHost.Content=new SplitEditor(Model,source,(DataTemplate)FindResource("ReceiverRow"),()=>{
+   Model.CloseSplit();SplitHost.Visibility=Visibility.Collapsed;SplitHost.Content=null;MainRouting.Visibility=Visibility.Visible;
+  });
+ }
+ private void SplitClick(object sender,RoutedEventArgs e){
+  if(sender is FrameworkElement{DataContext:Source source} button){
+   if(button.Tag?.ToString()=="held"){button.Tag=null;return;}
+   if(!Model.ToggleDefaultSplit(source))OpenSplit(source);
+  }
+ }
+ private void SplitButtonLoaded(object sender,RoutedEventArgs e){
+  if(sender is not FrameworkElement button||button.ToolTip?.ToString()=="Split · gotowy")return;
+  button.ToolTip="Split · gotowy";
+  var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(650)};
+  Point origin=new();bool pressing=false;
+  void Begin(Point point){origin=point;pressing=true;timer.Start();holdTimer.Stop();}
+  button.PreviewMouseLeftButtonDown+=(_,args)=>{if(args.StylusDevice==null)Begin(args.GetPosition(button));};
+  button.PreviewTouchDown+=(_,args)=>Begin(args.GetTouchPoint(button).Position);
+  button.PreviewMouseMove+=(_,args)=>{if((args.GetPosition(button)-origin).Length>12){timer.Stop();pressing=false;}};
+  button.PreviewTouchMove+=(_,args)=>{if((args.GetTouchPoint(button).Position-origin).Length>12){timer.Stop();pressing=false;}};
+  button.PreviewMouseLeftButtonUp+=(_,_)=>{timer.Stop();pressing=false;};
+  button.PreviewTouchUp+=(_,_)=>{timer.Stop();pressing=false;};
+  button.Unloaded+=(_,_)=>timer.Stop();
+  timer.Tick+=(_,_)=>{timer.Stop();if(pressing&&button.DataContext is Source source){button.Tag="held";OpenSplit(source);}};
+ }
  private void SourceMouseDown(object sender,MouseButtonEventArgs e){if(e.ClickCount==2&&sender is FrameworkElement{DataContext:Source source}){Model.ChooseSource(source,true);e.Handled=true;}}
  private void OpenGeneralSettings(object sender,RoutedEventArgs e)=>new GeneralSettingsWindow(Model){Owner=this}.ShowDialog();
+ private void SceneLoaded(object sender,RoutedEventArgs e){
+  if(sender is FrameworkElement{DataContext:RoutingCard card} target && target.Tag?.ToString()!="scene-menu"){
+   target.Tag="scene-menu";SceneMenu.Attach(target,Model,card);
+  }
+ }
  private void NewCard(object sender,RoutedEventArgs e)=>Model.CreateCard(false);
  private void CopyCard(object sender,RoutedEventArgs e)=>Model.CreateCard(true);
  private void SaveCard(object sender,RoutedEventArgs e)

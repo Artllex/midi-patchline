@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows.Input;
@@ -22,8 +22,29 @@ public sealed class Command : ICommand
     public void Execute(object? p)=>execute(p);
     public event EventHandler? CanExecuteChanged { add {} remove {} }
 }
+public sealed class SourceDetails
+{
+    public string Type {get;set;}="Inne";
+    public int? KeyCount {get;set;}
+    public int? FirstNote {get;set;}
+    public SourceDetails Copy()=>new(){Type=Type,KeyCount=KeyCount,FirstNote=FirstNote};
+    public static SourceDetails Detect(string name) {
+        var compact=new string(name.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        if(compact.Contains("seaboard2")||compact.Contains("seaboardrise2"))
+            return new(){Type="Klawiatura",KeyCount=49};
+        foreach(int count in new[]{49,61,88})
+            if(compact.Contains("impactgxp"+count))return new(){Type="Klawiatura",KeyCount=count};
+        return new();
+    }
+}
 public sealed class Source : Observable
 {
+    private bool solo;
+    public bool IsSolo {get=>solo;set{solo=value;Changed();}}
+    private int octaves;
+    public int Octaves {get=>octaves;set{octaves=value;Changed();Changed(nameof(OctaveLabel));}}
+    public string OctaveLabel=>$"{Octaves:+0;-0;0} oct";
+    public SourceDetails Details {get;set;}=new();
     public string Id { get; init; } = "";
     private string name=""; public string Name { get=>name; set {name=value;Changed();} }
     private string? imagePath; public string? ImagePath { get=>imagePath; set {imagePath=value;Changed();} }
@@ -46,6 +67,32 @@ public sealed class Endpoint
     public string? ImageKey { get; set; }
     public Endpoint Copy() { var copy=(Endpoint)MemberwiseClone();copy.Tags=Tags?.ToList();return copy; }
 }
+public sealed class SplitGroup {
+ public static string[] Types => new[]{"Zakres klawiszy","Velocity","Modwheel"}
+  .Concat(new[]{"Pitch Bend","Channel Aftertouch","Poly Aftertouch","Program Change","Release Velocity","Kanał MIDI"})
+  .Concat(Enumerable.Range(0,128).Where(n=>n!=1).Select(n=>"CC "+n.ToString("000"))).ToArray();
+ public string Type {get;set;}="Zakres klawiszy";
+ public Dictionary<string,int[]> ParameterRanges {get;set;}=new();
+ public int ParameterMax => Type=="Pitch Bend"?16383:Type=="Kanał MIDI"?16:127;
+ public int ParameterMin => Type=="Kanał MIDI"?1:0;
+ public int[] ParameterRange => ParameterRanges.TryGetValue(Type,out var range)?range:new[]{ParameterMin,ParameterMax};
+ public string Name {get;set;}="Grupa";
+ public int Low {get;set;}=0; public int High {get;set;}=127;
+ public int VelocityLow {get;set;}=1;public int VelocityHigh {get;set;}=127;
+ public int ModLow {get;set;}=0;public int ModHigh {get;set;}=127;
+ public List<Route> Routes {get;set;}=new();
+ public bool Accepts(int note,int velocity,int mod,IReadOnlyDictionary<string,int>? parameters=null){
+  if(Type=="Zakres klawiszy")return note>=Low&&note<=High;
+  if(Type=="Velocity")return velocity>=VelocityLow&&velocity<=VelocityHigh;
+  if(Type=="Modwheel")return mod>=ModLow&&mod<=ModHigh;
+  if(parameters==null||!parameters.TryGetValue(Type,out var value))return false;
+  return value>=ParameterRange[0]&&value<=ParameterRange[1];
+ }
+}
+public sealed class SplitProfile {
+ public string Id {get;set;}=Guid.NewGuid().ToString("N"); public string Name {get;set;}="Nowy split";
+ public List<SplitGroup> Groups {get;set;}=new(){new(){Name="Warstwa 1",High=59},new(){Name="Warstwa 2",Low=60}};
+}
 public sealed class Route
 {
     public string SourceId { get; set; } = "";
@@ -61,12 +108,16 @@ public sealed class RoutingCard : Observable
     public string Name {get=>name;set{name=value;Changed();}}
     private bool active;
     [System.Text.Json.Serialization.JsonIgnore] public bool IsActive {get=>active;set{active=value;Changed();}}
+    public Dictionary<string,string> SplitIds {get;set;}=new();
+    public Dictionary<string,int> SourceOctaves {get;set;}=new();
     public List<Route> Routes { get; set; } = new();
 }
 public sealed class SourceSection { public string Name {get;init;}=""; public List<Source> Sources {get;init;}=new(); public bool IsExpanded {get;set;}=true; }
-public sealed class SourceConfig { public string Interface {get;set;}="Windows MIDI"; public string Port {get;set;}=""; public int Channel {get;set;}=1; public List<string>? Tags {get;set;} public string Name { get; set; }=""; public string? ImagePath { get; set; } }
+public sealed class SourceConfig { public SourceDetails? Details {get;set;} public string Interface {get;set;}="Windows MIDI"; public string Port {get;set;}=""; public int Channel {get;set;}=1; public List<string>? Tags {get;set;} public string Name { get; set; }=""; public string? ImagePath { get; set; } }
 public sealed class StudioState
 {
+    public Dictionary<string,List<SplitProfile>> SplitProfiles {get;set;}=new();
+    public Dictionary<string,string> DefaultSplitIds {get;set;}=new();
     public List<string> SourceSectionOrder {get;set;}=new();
     public List<string> VisibleSourceIds {get;set;}=new(){"a","b"};
     public Dictionary<string,SourceConfig> SourceSettings { get; set; } = new();
@@ -135,15 +186,16 @@ public sealed class Receiver : Observable
         }
     }
     public bool IsUnavailable => !Endpoint.Available || string.IsNullOrWhiteSpace(Endpoint.Port);
+    public bool IsSolo => owner.SoloReceiverId==Endpoint.Id;
     public bool IsRouted => owner.ActiveRoute(Endpoint.Id)!=null;
     public string OctaveLabel => $"{(owner.ActiveRoute(Endpoint.Id)?.Octaves??0):+0;-0;0} oct";
     public string Hint => IsUnavailable ? "Niedostępny · możesz przypisać teraz i włączyć później" : $"{Endpoint.Port} · CH {Endpoint.Channel} · kliknij, aby zmienić przypisanie";
-    public void Refresh() { Changed(nameof(Name)); Changed(nameof(IsUnavailable)); Changed(nameof(Picture)); Changed(nameof(IsRouted)); Changed(nameof(OctaveLabel)); Changed(nameof(Hint)); }
+    public void Refresh() { Changed(nameof(Name)); Changed(nameof(IsUnavailable)); Changed(nameof(Picture)); Changed(nameof(IsRouted)); Changed(nameof(IsSolo)); Changed(nameof(OctaveLabel)); Changed(nameof(Hint)); }
 }
 public sealed class RouterViewModel : Observable
 {
     public Source[] Sources { get; private set; } = {
-        new() { Id="a", Name="ROLI Seaboard 2", Tags=new(){"Klawiatury"}, ImagePath="pack://application:,,,/Assets/roli.png" }, new() { Id="b", Name="Nektar Impact GXP61", Tags=new(){"Klawiatury"}, ImagePath="pack://application:,,,/Assets/nektar.png" },
+        new() { Id="a", Name="ROLI Seaboard 2", Tags=new(){"Klawiatury"}, Details=SourceDetails.Detect("ROLI Seaboard 2"), ImagePath="pack://application:,,,/Assets/roli.png" }, new() { Id="b", Name="Nektar Impact GXP61", Tags=new(){"Klawiatury"}, Details=SourceDetails.Detect("Nektar Impact GXP61"), ImagePath="pack://application:,,,/Assets/nektar.png" },
         new() { Id="other", Name="Źródło 3" },
         new() { Id="extra4", Name="Źródło 4" },
         new() { Id="extra5", Name="Źródło 5" },
@@ -157,12 +209,29 @@ public sealed class RouterViewModel : Observable
 
     };
     public IEnumerable<Source> PrimarySources => Sources.Where(s=>State.VisibleSourceIds.Contains(s.Id));
+    private string searchText="";
+    public string SearchText {
+        get=>searchText;
+        set {
+            if(searchText==value)return;
+            searchText=value??"";Changed();
+            RefreshSourceSections();RefreshFilter();
+        }
+    }
+    private bool MatchesSearch(string name,IEnumerable<string>? tags) =>
+        string.IsNullOrWhiteSpace(SearchText) ||
+        SearchText.Split((char[]?)null,StringSplitOptions.RemoveEmptyEntries).All(word=>
+            name.Contains(word,StringComparison.CurrentCultureIgnoreCase) ||
+            (tags?.Any(tag=>tag.Contains(word,StringComparison.CurrentCultureIgnoreCase))??false));
+    private readonly Dictionary<string,bool> sourceExpansion=new(StringComparer.OrdinalIgnoreCase);
     public List<SourceSection> SourceSections {get;private set;}=new();
     private void RefreshSourceSections(){
-        var expanded=SourceSections.ToDictionary(s=>s.Name,s=>s.IsExpanded,StringComparer.OrdinalIgnoreCase);
+        foreach(var section in SourceSections)sourceExpansion[section.Name]=section.IsExpanded;
+        var expanded=sourceExpansion;
+        var matchingSources=PrimarySources.Where(s=>MatchesSearch(s.Name,s.Tags)).ToList();
         var tags=PrimarySources.SelectMany(s=>s.Tags.Count==0?new[]{"Bez tagów"}:s.Tags.AsEnumerable()).Distinct(StringComparer.OrdinalIgnoreCase);
-        SourceSections=tags.Select(tag=>new SourceSection{Name=tag,Sources=PrimarySources.Where(s=>tag=="Bez tagów"?s.Tags.Count==0:s.Tags.Contains(tag,StringComparer.OrdinalIgnoreCase)).ToList(),IsExpanded=!expanded.TryGetValue(tag,out var value)||value})
-            .OrderBy(s=>{int index=State.SourceSectionOrder.FindIndex(t=>t.Equals(s.Name,StringComparison.OrdinalIgnoreCase));return index<0?int.MaxValue:index;}).ToList();
+        SourceSections=tags.Select(tag=>new SourceSection{Name=tag,Sources=matchingSources.Where(s=>tag=="Bez tagów"?s.Tags.Count==0:s.Tags.Contains(tag,StringComparer.OrdinalIgnoreCase)).ToList(),IsExpanded=!expanded.TryGetValue(tag,out var value)||value})
+            .Where(s=>s.Sources.Count>0).OrderBy(s=>{int index=State.SourceSectionOrder.FindIndex(t=>t.Equals(s.Name,StringComparison.OrdinalIgnoreCase));return index<0?int.MaxValue:index;}).ToList();
         Changed(nameof(SourceSections));
     }
     public void ReorderSourceSection(string name,int index){
@@ -172,7 +241,7 @@ public sealed class RouterViewModel : Observable
     }
     public IEnumerable<Source> OtherSources => Sources.Skip(2);
     public List<Receiver> Receivers { get; private set; } = new();
-    public IEnumerable<Receiver> HiddenReceivers => Receivers.Where(r=>r.Endpoint.Hidden);
+    public IEnumerable<Receiver> HiddenReceivers => Receivers.Where(r=>r.Endpoint.Hidden && MatchesSearch(r.Name,r.Endpoint.Tags));
     public IEnumerable<Receiver> Rack => Receivers.Where(r=>Matches(r.Endpoint) && r.Endpoint.Group=="RACK");
     public IEnumerable<Receiver> Keyboards => Receivers.Where(r=>Matches(r.Endpoint) && r.Endpoint.Group=="KEYBOARDS");
     public IEnumerable<Receiver> OnTop => Receivers.Where(r=>Matches(r.Endpoint) && r.Endpoint.Group=="ON TOP");
@@ -180,40 +249,99 @@ public sealed class RouterViewModel : Observable
     public bool ShowHidden { get; set; }
     public IEnumerable<string> AllTags => State.Endpoints.SelectMany(e=>e.Tags??new()).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t=>t);
     public string TagCaption => SelectedTags.Count==0 ? "Tagi" : "Tagi: "+string.Join(", ",SelectedTags);
-    private bool Matches(Endpoint e)=>(ShowHidden||!e.Hidden)&&(SelectedTags.Count==0||(e.Tags??new()).Any(t=>SelectedTags.Contains(t)));
-    public void RefreshFilter() { Changed(nameof(Rack));Changed(nameof(Keyboards));Changed(nameof(OnTop));Changed(nameof(HiddenReceivers));Changed(nameof(TagCaption)); }
+    private bool Matches(Endpoint e)=>MatchesSearch(e.Name,e.Tags)&&(ShowHidden||!e.Hidden)&&(SelectedTags.Count==0||(e.Tags??new()).Any(t=>SelectedTags.Contains(t)));
+    public void RefreshFilter() { Changed(nameof(Rack));Changed(nameof(Keyboards));Changed(nameof(OnTop));Changed(nameof(HiddenReceivers));Changed(nameof(TagCaption));Changed(nameof(HasRack));Changed(nameof(HasKeyboards));Changed(nameof(HasOnTop));Changed(nameof(HasHiddenReceivers)); }
+    public bool HasRack => Rack.Any();
+    public bool HasKeyboards => Keyboards.Any();
+    public bool HasOnTop => OnTop.Any();
+    public bool HasHiddenReceivers => HiddenReceivers.Any();
     public StudioState State { get; private set; }
     public IMidiBackend Backend { get; }
     private readonly string statePath;
     private bool preserveInvalidFile;
     private string status="";
     public string Status { get=>status; private set {status=value;Changed();} }
+    public void RestoreClickRoutes(List<Route> routes){
+        if(EditingGroup!=null)EditingGroup.Routes=routes;else ActiveCard.Routes=routes;Refresh();ApplyCurrentRoutes();Save();
+    }
+    public SplitProfile? EditingSplit {get;private set;}
+    public SplitGroup? EditingGroup {get;private set;}
+    public List<Route> EditingRoutes=>EditingGroup?.Routes??ActiveCard.Routes;
+    public void EditSplit(Source source,SplitProfile? profile=null){
+        ChooseSource(source,true);
+        if(!State.SplitProfiles.TryGetValue(source.Id,out var profiles))State.SplitProfiles[source.Id]=profiles=new();
+        if(profile==null){profile=profiles.FirstOrDefault();if(profile==null){profile=new();profiles.Add(profile);}}
+        EditingSplit=profile;EditingGroup=profile.Groups.FirstOrDefault();Refresh();Save();
+    }
+    public void SelectSplitGroup(SplitGroup group){EditingGroup=group;Refresh();}
+    public void CloseSplit(){EditingSplit=null;EditingGroup=null;Refresh();ApplyCurrentRoutes();Save();}
+    public bool ToggleDefaultSplit(Source source){
+        if(!State.DefaultSplitIds.TryGetValue(source.Id,out var id)||!State.SplitProfiles.TryGetValue(source.Id,out var list)||!list.Any(p=>p.Id==id))return false;
+        if(ActiveCard.SplitIds.GetValueOrDefault(source.Id)==id)ActiveCard.SplitIds.Remove(source.Id);else ActiveCard.SplitIds[source.Id]=id;
+        ApplyCurrentRoutes();Save();return true;
+    }
+    public IEnumerable<Route> RoutesForNote(string sourceId,int note,int velocity,int modwheel,IReadOnlyDictionary<string,int>? parameters=null){
+        if(SoloReceiverId!=null)return PlaybackRoutes.Where(r=>r.SourceId==sourceId);
+        if(ActiveCard.SplitIds.TryGetValue(sourceId,out var id)&&State.SplitProfiles.TryGetValue(sourceId,out var profiles)){
+            var profile=profiles.FirstOrDefault(p=>p.Id==id);
+            if(profile!=null)return profile.Groups.Where(g=>g.Accepts(note,velocity,modwheel,parameters)).SelectMany(g=>g.Routes).ToList();
+        }
+        return ActiveCard.Routes.Where(r=>r.SourceId==sourceId);
+    }
+    public string? SoloReceiverId {get;private set;}
+    public void ToggleSolo(Receiver receiver){
+        if(!Receivers.Contains(receiver))return;
+        SoloReceiverId=SoloReceiverId==receiver.Endpoint.Id?null:receiver.Endpoint.Id;
+        Refresh();ApplyCurrentRoutes();
+    }
+    public IEnumerable<Route> PlaybackRoutes => SoloReceiverId==null?ActiveCard.Routes:
+        new[]{new Route{SourceId=State.SelectedSourceId,ReceiverId=SoloReceiverId,Octaves=ActiveRoute(SoloReceiverId)?.Octaves??0}};
+    private void ApplyCurrentRoutes()=>Backend.ApplyRoutes(PlaybackRoutes);
     public Command SelectSource { get; }
     public Command ToggleReceiver { get; }
     public Command Panic { get; }
-    public bool ExtendedSelection { get; private set; }
+    private bool extendedSelection;
+    private bool controlSelection;
+    public bool ExtendedSelection => extendedSelection||controlSelection;
+    public void SetControlSelection(bool value){
+        if(controlSelection==value)return;
+        controlSelection=value;Changed(nameof(ExtendedSelection));
+    }
     public string SelectionLabel => "Wybrana";
     public Command OctaveDown { get; }
     public Command OctaveUp { get; }
     public void ChooseSource(Source source, bool extended)
     {
         if(!Sources.Contains(source))return;
+        SoloReceiverId=null;
         State.SelectedSourceId=source.Id;
-        ExtendedSelection=extended;
+        extendedSelection=extended;
         foreach(var s in Sources)s.IsSelected=s==source;
         Changed(nameof(ExtendedSelection));Changed(nameof(SelectionLabel));
         Status=extended ? "Wybór wielu odbiorców · klikaj, aby dodawać lub usuwać." : "Wybór jednego odbiorcy · kliknięcie odbiorcy zastępuje poprzednie przypisania.";
-        Refresh();Save();
+        Refresh();ApplyCurrentRoutes();Save();
     }
     private void ChangeOctave(object? parameter,int delta)
     {
-        if(parameter is not Receiver receiver || !receiver.IsRouted)return;
+        if(parameter is Source source){
+            source.Octaves=Math.Clamp(source.Octaves+delta,-4,4);
+            ActiveCard.SourceOctaves[source.Id]=source.Octaves;Save();return;
+        }
+        if(parameter is not Receiver receiver)return;
+        if(!receiver.IsRouted){Toggle(receiver);return;}
         var route=ActiveRoute(receiver.Endpoint.Id)!;
         SetOctaves(receiver.Endpoint.Id,Math.Clamp(route.Octaves+delta,-4,4));
-        Backend.ApplyRoutes(ActiveCard.Routes);Save();
+        ApplyCurrentRoutes();Save();
     }
     public List<RoutingCard> Cards => State.Cards;
     public IEnumerable<RoutingCard> PinnedCards => State.Cards.Where(c=>c.IsPinned);
+    public void DeleteCard(RoutingCard card){
+        if(!State.Cards.Remove(card))return;
+        if(State.Cards.Count==0)State.Cards.Add(new RoutingCard{Id=Guid.NewGuid().ToString("N"),Name="Nowa scena"});
+        Changed(nameof(Cards));Changed(nameof(PinnedCards));
+        if(State.ActiveCardId==card.Id)ActivateCard(State.Cards[0].Id);
+        Save();
+    }
     public void SetCardPinned(RoutingCard card,bool value){
         if(!State.Cards.Contains(card))return;
         card.IsPinned=value;Changed(nameof(PinnedCards));Save();
@@ -221,11 +349,14 @@ public sealed class RouterViewModel : Observable
     public Command SelectCard => new(p=>{if(p is RoutingCard card)ActivateCard(card.Id);});
     public void ActivateCard(string id){
         if(!State.Cards.Any(c=>c.Id==id))return;
+        SoloReceiverId=null;EditingSplit=null;EditingGroup=null;
         State.ActiveCardId=id;foreach(var c in State.Cards)c.IsActive=c.Id==id;
-        Changed(nameof(ActiveCard));Refresh();Backend.ApplyRoutes(ActiveCard.Routes);Save();
+        Changed(nameof(ActiveCard));Refresh();ApplyCurrentRoutes();Save();
     }
     public RoutingCard CreateCard(bool copy){
         var card=new RoutingCard{Id=Guid.NewGuid().ToString("N"),Name="Karta "+(State.Cards.Count+1)};
+        if(copy)card.SplitIds=new(ActiveCard.SplitIds);
+        if(copy)card.SourceOctaves=new(ActiveCard.SourceOctaves);
         if(copy)card.Routes=ActiveCard.Routes.Select(r=>new Route{SourceId=r.SourceId,ReceiverId=r.ReceiverId,Octaves=r.Octaves}).ToList();
         State.Cards.Add(card);Changed(nameof(Cards));Changed(nameof(PinnedCards));ActivateCard(card.Id);return card;
     }
@@ -245,7 +376,7 @@ public sealed class RouterViewModel : Observable
                 Sources=Sources.Append(new Source{Id=id,Name=config.Name,ImagePath=config.ImagePath}).ToArray();
         foreach(var c in State.Cards)c.IsActive=c.Id==State.ActiveCardId;
         if(!State.VisibleSourceIds.Contains(State.SelectedSourceId))State.SelectedSourceId="a";
-        foreach(var s in Sources)if(State.SourceSettings.TryGetValue(s.Id,out var saved)){s.Name=saved.Name;s.ImagePath=saved.ImagePath;s.Interface=saved.Interface;s.Port=saved.Port;s.Channel=saved.Channel;if(saved.Tags!=null)s.Tags=saved.Tags.ToList();}
+        foreach(var s in Sources)if(State.SourceSettings.TryGetValue(s.Id,out var saved)){s.Name=saved.Name;s.Details=saved.Details?.Copy()??SourceDetails.Detect(saved.Name);s.ImagePath=saved.ImagePath;s.Interface=saved.Interface;s.Port=saved.Port;s.Channel=saved.Channel;if(saved.Tags!=null)s.Tags=saved.Tags.ToList();}
         foreach(var endpoint in new Endpoint[] {
             new(){Id="kobol",Name="Kobol",Group="RACK",Port="OUT 6"},
             new(){Id="model-d",Name="Model D",Group="RACK",Port="OUT 7"},
@@ -261,36 +392,38 @@ public sealed class RouterViewModel : Observable
         RefreshSourceSections();
         BuildReceivers();
         foreach(var s in Sources) s.IsSelected=s.Id==State.SelectedSourceId;
+        foreach(var source in Sources)source.Octaves=ActiveCard.SourceOctaves.GetValueOrDefault(source.Id);
         SelectSource=new(p=> {if(p is Source s)ChooseSource(s,false);});
         OctaveDown=new(p=>ChangeOctave(p,-1)); OctaveUp=new(p=>ChangeOctave(p,1));
         ToggleReceiver=new(p=> {if(p is Receiver r)Toggle(r);});
         Panic=new(_=> {Backend.Panic();Status="PANIC · symulacja zatrzymania wszystkich nut. Przypisania zachowane.";});
         if(string.IsNullOrEmpty(Status)) Status=Backend.Description;
     }
-    public Route? ActiveRoute(string id)=>ActiveCard.Routes.FirstOrDefault(r=>r.SourceId==State.SelectedSourceId&&r.ReceiverId==id);
+    public Route? ActiveRoute(string id)=>EditingRoutes.FirstOrDefault(r=>r.SourceId==State.SelectedSourceId&&r.ReceiverId==id);
     private void Toggle(Receiver receiver)
     {
 
         var route=ActiveRoute(receiver.Endpoint.Id);
         if(!ExtendedSelection)
-            ActiveCard.Routes.RemoveAll(r=>r.SourceId==State.SelectedSourceId&&r!=route);
-        if(route==null)ActiveCard.Routes.Add(new(){SourceId=State.SelectedSourceId,ReceiverId=receiver.Endpoint.Id});
-        else ActiveCard.Routes.Remove(route);
-        Backend.ApplyRoutes(ActiveCard.Routes);
+            EditingRoutes.RemoveAll(r=>r.SourceId==State.SelectedSourceId&&r!=route);
+        if(route==null)EditingRoutes.Add(new(){SourceId=State.SelectedSourceId,ReceiverId=receiver.Endpoint.Id});
+        else EditingRoutes.Remove(route);
+        ApplyCurrentRoutes();
         Refresh();Save();
     }
-    public void UpdateSource(Source source,string name,string? image,IEnumerable<string>? tags=null,string? midiInterface=null,string? port=null,int? channel=null)
+    public void UpdateSource(Source source,string name,string? image,IEnumerable<string>? tags=null,string? midiInterface=null,string? port=null,int? channel=null,SourceDetails? details=null)
     {
         if(string.IsNullOrWhiteSpace(name))throw new ArgumentException("Wpisz nazwę źródła.");
         if(!Sources.Contains(source)){
             Sources=Sources.Append(source).ToArray();
             if(!State.VisibleSourceIds.Contains(source.Id))State.VisibleSourceIds.Add(source.Id);
         }
+        if(details!=null)source.Details=details.Copy();
         source.Name=name.Trim();source.ImagePath=image;
         Changed(nameof(PrimarySources));
         if(tags!=null)source.Tags=tags.Select(t=>t.Trim()).Where(t=>t.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if(midiInterface!=null)source.Interface=midiInterface;if(port!=null)source.Port=port;if(channel!=null)source.Channel=channel.Value;
-        State.SourceSettings[source.Id]=new(){Name=source.Name,ImagePath=image,Tags=source.Tags.ToList(),Interface=source.Interface,Port=source.Port,Channel=source.Channel};RefreshSourceSections();Save();
+        State.SourceSettings[source.Id]=new(){Details=source.Details.Copy(),Name=source.Name,ImagePath=image,Tags=source.Tags.ToList(),Interface=source.Interface,Port=source.Port,Channel=source.Channel};RefreshSourceSections();Save();
     }
     public void SetOctaves(string id,int value)
     {
@@ -307,14 +440,15 @@ public sealed class RouterViewModel : Observable
         State.Endpoints=copies;
         foreach(var pair in octaves)SetOctaves(pair.Key,pair.Value);
         RefreshSourceSections();
-        BuildReceivers();Backend.ApplyRoutes(ActiveCard.Routes);Save();
+        if(SoloReceiverId!=null&&!State.Endpoints.Any(e=>e.Id==SoloReceiverId&&e.Available&&!string.IsNullOrWhiteSpace(e.Port)))SoloReceiverId=null;
+        BuildReceivers();Refresh();ApplyCurrentRoutes();Save();
     }
     private void BuildReceivers()
     {
         Receivers=State.Endpoints.Select(e=>new Receiver(this,e)).ToList();
-        Changed(nameof(Rack));Changed(nameof(Keyboards));Changed(nameof(OnTop));Changed(nameof(HiddenReceivers));
+        RefreshFilter();
     }
-    private void Refresh() {foreach(var r in Receivers)r.Refresh();}
+    private void Refresh() {foreach(var source in Sources){source.Octaves=ActiveCard.SourceOctaves.GetValueOrDefault(source.Id);source.IsSolo=SoloReceiverId!=null&&source.Id==State.SelectedSourceId;}foreach(var r in Receivers)r.Refresh();}
     private static StudioState Defaults()=>new()
     {
         Endpoints=new() {

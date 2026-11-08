@@ -1,13 +1,38 @@
-using System.Windows;
+﻿using System.Windows;
 namespace MidiRouter;
 public sealed class EndpointDraft : Observable
 {
+    public bool IsSource {get;set;}
+    public System.Windows.Visibility SourceVisibility => IsSource?Visibility.Visible:Visibility.Collapsed;
+    public string[] SourceTypes => new[]{"Klawiatura","Sekwencer","Pady / perkusja","Kontroler","Pedały","Program / DAW","Inne"};
+    private string sourceType="Inne";
+    public string SourceType {get=>sourceType;set{sourceType=value;Changed();Changed(nameof(KeyboardVisibility));}}
+    public System.Windows.Visibility KeyboardVisibility => SourceType=="Klawiatura"?Visibility.Visible:Visibility.Collapsed;
+    private string keyCountText="";
+    public string KeyCountText {get=>keyCountText;set{keyCountText=value;Changed();Changed(nameof(RangeLabel));}}
+    public int[] KeyCounts => new[]{25,32,37,49,61,73,76,88};
+    public IEnumerable<MidiPortOption> NoteOptions => new[]{new MidiPortOption{Value="",Label="Nie ustawiono"}}.Concat(Enumerable.Range(0,128).Select(n=>new MidiPortOption{Value=n.ToString(),Label=NoteLabel(n)}));
+    private string firstNoteText="";
+    public string FirstNoteText {get=>firstNoteText;set{firstNoteText=value??"";Changed();Changed(nameof(RangeLabel));}}
+    public string RangeLabel => int.TryParse(KeyCountText,out var count)&&int.TryParse(FirstNoteText,out var first)&&count>0&&first+count<=128
+        ? NoteLabel(first)+" — "+NoteLabel(first+count-1) : "Wskaż liczbę klawiszy i najniższą nutę.";
+    private static string NoteLabel(int n)=>new[]{"C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"}[n%12]+(n/12-1)+" · MIDI "+n;
+    public string DetectionMessage {get;private set;}="";
+    public void DetectKeyboard() {
+        var detected=SourceDetails.Detect(Name);
+        if(detected.KeyCount==null)detected=SourceDetails.Detect(Port);
+        if(detected.KeyCount is int count){SourceType="Klawiatura";KeyCountText=count.ToString();DetectionMessage="Profil modelu: "+count+" klawiszy.";}
+        else DetectionMessage="Brak profilu modelu. Ustaw dane ręcznie.";
+        Changed(nameof(DetectionMessage));
+    }
     public Endpoint Original { get; }
-    public string Name { get; set; }
+    private string name="";
+    public string Name {get=>name;set{if(name==value)return;name=value??"";Changed();if(IsSource)DetectKeyboard();}}
     public string Interface { get; set; }
     public List<string> Interfaces {get;} = new(){"Windows MIDI"};
     public IEnumerable<string> Channels => Enumerable.Range(1,16).Select(c=>c.ToString());
-    public string Port { get; set; }
+    private string port="";
+    public string Port {get=>port;set{if(port==value)return;port=value??"";Changed();if(IsSource)DetectKeyboard();}}
     public List<MidiPortOption> PortOptions { get; }
     public string TagsText { get; set; }
     public bool Hidden { get; set; }
@@ -48,7 +73,8 @@ public partial class SettingsWindow : Window
     public SettingsWindow(RouterViewModel owner,Source source){
         model=owner;editingSource=source;
         var endpoint=new Endpoint{Id=source.Id,Name=source.Name,Tags=source.Tags.ToList(),ImageKey=source.ImagePath??"",Interface=source.Interface,Port=source.Port,Channel=source.Channel};
-        var draft=new EndpointDraft(endpoint,null,true);
+        var draft=new EndpointDraft(endpoint,null,true){IsSource=true,SourceType=source.Details.Type,KeyCountText=source.Details.KeyCount?.ToString()??"",FirstNoteText=source.Details.FirstNote?.ToString()??""};
+        if(string.IsNullOrEmpty(draft.KeyCountText)||draft.SourceType=="Inne")draft.DetectKeyboard();
         if(!draft.Interfaces.Contains(source.Interface))draft.Interfaces.Add(source.Interface);
         if(!draft.Interfaces.Contains(model.State.MainInterface))draft.Interfaces.Add(model.State.MainInterface);
         Drafts=new(){draft};
@@ -67,8 +93,17 @@ public partial class SettingsWindow : Window
         if(editingSource!=null){
             var draft=Drafts[0];
             if(!int.TryParse(draft.ChannelText,out var channel)||channel<1||channel>16){Error.Text="Kanał musi być liczbą od 1 do 16.";return;}
+            var details=new SourceDetails{Type=draft.SourceType};
+            if(draft.SourceType=="Klawiatura"){
+                if(!int.TryParse(draft.KeyCountText,out var keys)||keys<1||keys>128){Error.Text="Podaj liczbę klawiszy od 1 do 128.";return;}
+                details.KeyCount=keys;
+                if(!string.IsNullOrWhiteSpace(draft.FirstNoteText)){
+                    if(!int.TryParse(draft.FirstNoteText,out var first)||first<0||first+keys>128){Error.Text="Zakres klawiatury musi mieścić się w MIDI 0–127.";return;}
+                    details.FirstNote=first;
+                }
+            }
             try{
-                model.UpdateSource(editingSource,draft.Name,ArtworkPicker.UriFor(draft.ImageKey),draft.TagsText.Split(','),draft.Interface,draft.Port??"",channel);
+                model.UpdateSource(editingSource,draft.Name,ArtworkPicker.UriFor(draft.ImageKey),draft.TagsText.Split(','),draft.Interface,draft.Port??"",channel,details);
                 DialogResult=true;
             }catch(ArgumentException ex){Error.Text=ex.Message;}
             return;
