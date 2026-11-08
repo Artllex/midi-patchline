@@ -1,0 +1,86 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MidiPatchline</AssemblyName>
+    <Product>MIDI Patchline</Product>
+    <Title>MIDI Patchline</Title>
+    <Description>Routing MIDI i presety studia</Description>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <Version>0.1.68</Version>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+  <ItemGroup><Resource Include="Assets\*.png"/></ItemGroup>
+</Project>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
