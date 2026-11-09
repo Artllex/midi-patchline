@@ -68,6 +68,7 @@ public sealed class Endpoint
     public Endpoint Copy() { var copy=(Endpoint)MemberwiseClone();copy.Tags=Tags?.ToList();return copy; }
 }
 public sealed class SplitGroup {
+ public bool IsEnabled { get; set; } = true;
  public static string[] Types => new[]{"Zakres klawiszy","Velocity","Modwheel"}
   .Concat(new[]{"Pitch Bend","Channel Aftertouch","Poly Aftertouch","Program Change","Release Velocity","Kanał MIDI"})
   .Concat(Enumerable.Range(0,128).Where(n=>n!=1).Select(n=>"CC "+n.ToString("000"))).ToArray();
@@ -82,6 +83,7 @@ public sealed class SplitGroup {
  public int ModLow {get;set;}=0;public int ModHigh {get;set;}=127;
  public List<Route> Routes {get;set;}=new();
  public bool Accepts(int note,int velocity,int mod,IReadOnlyDictionary<string,int>? parameters=null){
+  if(!IsEnabled)return false;
   if(Type=="Zakres klawiszy")return note>=Low&&note<=High;
   if(Type=="Velocity")return velocity>=VelocityLow&&velocity<=VelocityHigh;
   if(Type=="Modwheel")return mod>=ModLow&&mod<=ModHigh;
@@ -90,6 +92,7 @@ public sealed class SplitGroup {
  }
 }
 public sealed class SplitProfile {
+ public bool IsPinned { get; set; } = true;
  public string Id {get;set;}=Guid.NewGuid().ToString("N"); public string Name {get;set;}="Nowy split";
  public List<SplitGroup> Groups {get;set;}=new(){new(){Name="Warstwa 1",High=59},new(){Name="Warstwa 2",Low=60}};
 }
@@ -117,7 +120,7 @@ public sealed class SourceConfig { public SourceDetails? Details {get;set;} publ
 public sealed class StudioState
 {
     public Dictionary<string,List<SplitProfile>> SplitProfiles {get;set;}=new();
-    public Dictionary<string,string> DefaultSplitIds {get;set;}=new();
+    public GraphicsPreferences Graphics { get; set; } = new();
     public List<string> SourceSectionOrder {get;set;}=new();
     public List<string> VisibleSourceIds {get;set;}=new(){"a","b"};
     public Dictionary<string,SourceConfig> SourceSettings { get; set; } = new();
@@ -194,7 +197,7 @@ public sealed class Receiver : Observable
 }
 public sealed class RouterViewModel : Observable
 {
-    public Source[] Sources { get; private set; } = {
+    private static Source[] BuiltInSources() => new Source[] {
         new() { Id="a", Name="ROLI Seaboard 2", Tags=new(){"Klawiatury"}, Details=SourceDetails.Detect("ROLI Seaboard 2"), ImagePath="pack://application:,,,/Assets/roli.png" }, new() { Id="b", Name="Nektar Impact GXP61", Tags=new(){"Klawiatury"}, Details=SourceDetails.Detect("Nektar Impact GXP61"), ImagePath="pack://application:,,,/Assets/nektar.png" },
         new() { Id="other", Name="Źródło 3" },
         new() { Id="extra4", Name="Źródło 4" },
@@ -208,6 +211,7 @@ public sealed class RouterViewModel : Observable
         new() { Id="extra12", Name="Źródło 12" }
 
     };
+    public Source[] Sources { get; private set; } = BuiltInSources();
     public IEnumerable<Source> PrimarySources => Sources.Where(s=>State.VisibleSourceIds.Contains(s.Id));
     private string searchText="";
     public string SearchText {
@@ -256,6 +260,24 @@ public sealed class RouterViewModel : Observable
     public bool HasOnTop => OnTop.Any();
     public bool HasHiddenReceivers => HiddenReceivers.Any();
     public StudioState State { get; private set; }
+    public GraphicsPreferences Graphics => State.Graphics;
+
+    public bool UpdateGeneralSettings(string midiInterface, GraphicsPreferences graphics)
+    {
+        var previousInterface = State.MainInterface;
+        var previousGraphics = State.Graphics;
+        State.MainInterface = midiInterface;
+        State.Graphics = graphics;
+        if (!Save())
+        {
+            State.MainInterface = previousInterface;
+            State.Graphics = previousGraphics;
+            return false;
+        }
+
+        Changed(nameof(Graphics));
+        return true;
+    }
     public IMidiBackend Backend { get; }
     private readonly string statePath;
     private bool preserveInvalidFile;
@@ -267,18 +289,44 @@ public sealed class RouterViewModel : Observable
     public SplitProfile? EditingSplit {get;private set;}
     public SplitGroup? EditingGroup {get;private set;}
     public List<Route> EditingRoutes=>EditingGroup?.Routes??ActiveCard.Routes;
+    public static string NextSplitName(IEnumerable<SplitProfile> profiles)
+    {
+        var names = profiles.Select(profile => profile.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        int number = 1;
+        while (names.Contains($"Split {number}")) number++;
+        return $"Split {number}";
+    }
+
     public void EditSplit(Source source,SplitProfile? profile=null){
         ChooseSource(source,true);
         if(!State.SplitProfiles.TryGetValue(source.Id,out var profiles))State.SplitProfiles[source.Id]=profiles=new();
-        if(profile==null){profile=profiles.FirstOrDefault();if(profile==null){profile=new();profiles.Add(profile);}}
+        if(profile==null){profile=profiles.FirstOrDefault(p=>p.Id==ActiveCard.SplitIds.GetValueOrDefault(source.Id))??profiles.FirstOrDefault();if(profile==null){profile=new SplitProfile{Name=NextSplitName(profiles)};profiles.Add(profile);}}
         EditingSplit=profile;EditingGroup=profile.Groups.FirstOrDefault();Refresh();Save();
     }
     public void SelectSplitGroup(SplitGroup group){EditingGroup=group;Refresh();}
     public void CloseSplit(){EditingSplit=null;EditingGroup=null;Refresh();ApplyCurrentRoutes();Save();}
-    public bool ToggleDefaultSplit(Source source){
-        if(!State.DefaultSplitIds.TryGetValue(source.Id,out var id)||!State.SplitProfiles.TryGetValue(source.Id,out var list)||!list.Any(p=>p.Id==id))return false;
-        if(ActiveCard.SplitIds.GetValueOrDefault(source.Id)==id)ActiveCard.SplitIds.Remove(source.Id);else ActiveCard.SplitIds[source.Id]=id;
-        ApplyCurrentRoutes();Save();return true;
+    public void SetSplitGroupEnabled(SplitGroup group, bool enabled)
+    {
+        var previous = group.IsEnabled;
+        group.IsEnabled = enabled;
+        if (Save())
+            ApplyCurrentRoutes();
+        else
+            group.IsEnabled = previous;
+    }
+
+    public void ToggleSplit(Source source, SplitProfile profile)
+    {
+        if (!State.SplitProfiles.TryGetValue(source.Id, out var profiles) || !profiles.Contains(profile))
+            return;
+
+        if (ActiveCard.SplitIds.GetValueOrDefault(source.Id) == profile.Id)
+            ActiveCard.SplitIds.Remove(source.Id);
+        else
+            ActiveCard.SplitIds[source.Id] = profile.Id;
+
+        ApplyCurrentRoutes();
+        Save();
     }
     public IEnumerable<Route> RoutesForNote(string sourceId,int note,int velocity,int modwheel,IReadOnlyDictionary<string,int>? parameters=null){
         if(SoloReceiverId!=null)return PlaybackRoutes.Where(r=>r.SourceId==sourceId);
@@ -371,6 +419,20 @@ public sealed class RouterViewModel : Observable
         statePath=path??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"MidiRouter","studio.json");
         Backend=backend??new MockMidiBackend();
         State=Load();
+        LoadWorkspace();
+        SelectSource=new(p=> {if(p is Source s)ChooseSource(s,false);});
+        OctaveDown=new(p=>ChangeOctave(p,-1)); OctaveUp=new(p=>ChangeOctave(p,1));
+        ToggleReceiver=new(p=> {if(p is Receiver r)Toggle(r);});
+        Panic=new(_=> {Backend.Panic();Status="PANIC · symulacja zatrzymania wszystkich nut. Przypisania zachowane.";});
+        if(string.IsNullOrEmpty(Status)) Status=Backend.Description;
+    }
+    private void LoadWorkspace()
+    {
+        Sources = BuiltInSources();
+        EditingSplit = null;
+        EditingGroup = null;
+        SoloReceiverId = null;
+        State.Graphics ??= new GraphicsPreferences();
         foreach(var id in State.VisibleSourceIds)
             if(!Sources.Any(s=>s.Id==id)&&State.SourceSettings.TryGetValue(id,out var config))
                 Sources=Sources.Append(new Source{Id=id,Name=config.Name,ImagePath=config.ImagePath}).ToArray();
@@ -393,12 +455,36 @@ public sealed class RouterViewModel : Observable
         BuildReceivers();
         foreach(var s in Sources) s.IsSelected=s.Id==State.SelectedSourceId;
         foreach(var source in Sources)source.Octaves=ActiveCard.SourceOctaves.GetValueOrDefault(source.Id);
-        SelectSource=new(p=> {if(p is Source s)ChooseSource(s,false);});
-        OctaveDown=new(p=>ChangeOctave(p,-1)); OctaveUp=new(p=>ChangeOctave(p,1));
-        ToggleReceiver=new(p=> {if(p is Receiver r)Toggle(r);});
-        Panic=new(_=> {Backend.Panic();Status="PANIC · symulacja zatrzymania wszystkich nut. Przypisania zachowane.";});
-        if(string.IsNullOrEmpty(Status)) Status=Backend.Description;
     }
+
+    public bool ReplaceStudio(StudioState studio)
+    {
+        ValidateStudio(studio);
+        var previous = State;
+        State = studio;
+        if (!Save())
+        {
+            State = previous;
+            return false;
+        }
+
+        LoadWorkspace();
+        Changed(nameof(Graphics));
+        Changed(nameof(PrimarySources));
+        Changed(nameof(Cards));
+        Changed(nameof(PinnedCards));
+        Changed(nameof(ActiveCard));
+        ApplyCurrentRoutes();
+        return true;
+    }
+
+    public static StudioState NewStudio()
+    {
+        var studio = Defaults();
+        studio.Cards[0].Routes.Clear();
+        return studio;
+    }
+
     public Route? ActiveRoute(string id)=>EditingRoutes.FirstOrDefault(r=>r.SourceId==State.SelectedSourceId&&r.ReceiverId==id);
     private void Toggle(Receiver receiver)
     {
@@ -464,22 +550,7 @@ public sealed class RouterViewModel : Observable
     {
         if(!File.Exists(statePath))return Defaults();
         try {
-            var state=JsonSerializer.Deserialize<StudioState>(File.ReadAllText(statePath))??throw new InvalidDataException();
-            if(state.SelectedSourceId=="roli")state.SelectedSourceId="a";
-            if(state.Cards!=null)foreach(var card in state.Cards.Where(c=>c?.Routes!=null)) {
-                foreach(var route in card.Routes.Where(r=>r!=null&&r.SourceId=="roli"))route.SourceId="a";
-                card.Routes=card.Routes.GroupBy(r=>(r.SourceId,r.ReceiverId)).Select(g=>g.First()).ToList();
-            }
-            if(state.Version!=1 || state.Endpoints==null || state.Cards==null ||
-               state.Endpoints.Any(e=>e==null||string.IsNullOrWhiteSpace(e.Id)||string.IsNullOrWhiteSpace(e.Name)||e.Channel<1||e.Channel>16||!new[]{"RACK","KEYBOARDS","ON TOP"}.Contains(e.Group)) ||
-               state.Endpoints.Select(e=>e.Id).Distinct().Count()!=state.Endpoints.Count ||
-               state.Cards.Count==0 || state.Cards.Any(c=>c==null||string.IsNullOrWhiteSpace(c.Id)||c.Routes==null) ||
-               state.Cards.Select(c=>c.Id).Distinct().Count()!=state.Cards.Count ||
-               !state.Cards.Any(c=>c.Id==state.ActiveCardId) || (!Sources.Any(s=>s.Id==state.SelectedSourceId)&&!state.SourceSettings.ContainsKey(state.SelectedSourceId)) ||
-               state.Cards.Any(c=>c.Routes.Any(r=>r==null||(!Sources.Any(s=>s.Id==r.SourceId)&&!state.SourceSettings.ContainsKey(r.SourceId))||!state.Endpoints.Any(e=>e.Id==r.ReceiverId)||r.Octaves < -4||r.Octaves>4) ||
-                   c.Routes.Select(r=>(r.SourceId,r.ReceiverId)).Distinct().Count()!=c.Routes.Count))
-                throw new InvalidDataException();
-            return state;
+            return ReadStudio(statePath);
         }
         catch(Exception ex) when(ex is IOException or JsonException or InvalidDataException or UnauthorizedAccessException)
         {
@@ -487,13 +558,44 @@ public sealed class RouterViewModel : Observable
             return Defaults();
         }
     }
+    public static StudioState ReadStudio(string path)
+    {
+        var state = JsonSerializer.Deserialize<StudioState>(File.ReadAllText(path)) ?? throw new InvalidDataException("Brak konfiguracji studia.");
+        ValidateStudio(state);
+        return state;
+    }
+
+    private static void ValidateStudio(StudioState state)
+    {
+        var builtInSources = BuiltInSources();
+            if(state.SelectedSourceId=="roli")state.SelectedSourceId="a";
+            if(state.Cards!=null)foreach(var card in state.Cards.Where(c=>c?.Routes!=null)) {
+                if(card.Routes.Any(route=>route==null))throw new InvalidDataException("Scena zawiera pustą trasę.");
+                foreach(var route in card.Routes.Where(r=>r.SourceId=="roli"))route.SourceId="a";
+                card.Routes=card.Routes.GroupBy(r=>(r.SourceId,r.ReceiverId)).Select(g=>g.First()).ToList();
+            }
+            if(state.Version!=1 || state.Endpoints==null || state.Cards==null || state.SourceSettings==null || state.VisibleSourceIds==null || state.SplitProfiles==null || state.SectionOrder==null || state.SourceSectionOrder==null ||
+               state.Endpoints.Any(e=>e==null||string.IsNullOrWhiteSpace(e.Id)||string.IsNullOrWhiteSpace(e.Name)||e.Channel<1||e.Channel>16||!new[]{"RACK","KEYBOARDS","ON TOP"}.Contains(e.Group)) ||
+               state.Endpoints.Select(e=>e.Id).Distinct().Count()!=state.Endpoints.Count ||
+               state.Cards.Count==0 || state.Cards.Any(c=>c==null||string.IsNullOrWhiteSpace(c.Id)||c.Routes==null) ||
+               state.Cards.Select(c=>c.Id).Distinct().Count()!=state.Cards.Count ||
+               !state.Cards.Any(c=>c.Id==state.ActiveCardId) || (!builtInSources.Any(s=>s.Id==state.SelectedSourceId)&&!state.SourceSettings.ContainsKey(state.SelectedSourceId)) ||
+               state.Cards.Any(c=>c.Routes.Any(r=>r==null||(!builtInSources.Any(s=>s.Id==r.SourceId)&&!state.SourceSettings.ContainsKey(r.SourceId))||!state.Endpoints.Any(e=>e.Id==r.ReceiverId)||r.Octaves < -4||r.Octaves>4) ||
+                   c.Routes.Select(r=>(r.SourceId,r.ReceiverId)).Distinct().Count()!=c.Routes.Count))
+                throw new InvalidDataException();
+        StudioFiles.ValidateProfiles(state.SplitProfiles, state.Endpoints.Select(endpoint => endpoint.Id).ToHashSet(), id =>
+            builtInSources.Any(source => source.Id == id) || state.SourceSettings.ContainsKey(id));
+        if (state.Cards.Any(card => card.SplitIds == null || card.SourceOctaves == null || card.SplitIds.Any(pair =>
+            !state.SplitProfiles.TryGetValue(pair.Key, out var profiles) || !profiles.Any(profile => profile.Id == pair.Value))))
+            throw new InvalidDataException("Nieprawidłowe przypisanie Splitu do sceny.");
+    }
+
     public bool Save()
     {
         try {
             Directory.CreateDirectory(Path.GetDirectoryName(statePath)!);
             if(preserveInvalidFile&&File.Exists(statePath)) {File.Copy(statePath,statePath+".invalid-"+DateTime.UtcNow.ToString("yyyyMMddHHmmssfff"));preserveInvalidFile=false;}
-            File.WriteAllText(statePath+".tmp",JsonSerializer.Serialize(State,new JsonSerializerOptions{WriteIndented=true}));
-            File.Move(statePath+".tmp",statePath,true);
+            StudioFiles.Write(statePath, State);
             return true;
         }
         catch(Exception ex) when(ex is IOException or UnauthorizedAccessException) {Status="Nie udało się zapisać konfiguracji: "+ex.Message;return false;}

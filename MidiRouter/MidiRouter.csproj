@@ -11,7 +11,7 @@
     <Title>MIDI Patchline</Title>
     <Description>Routing MIDI i presety studia</Description>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>0.1.99</Version>
+    <Version>0.1.104</Version>
     <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
   <ItemGroup><Resource Include="Assets\*.png"/></ItemGroup>

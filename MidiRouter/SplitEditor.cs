@@ -5,52 +5,133 @@ using System.Windows.Shapes;
 namespace MidiRouter;
 public sealed class SplitEditor : UserControl {
  readonly RouterViewModel model;readonly Source source;
- readonly StackPanel groups=new();readonly ComboBox profiles=new(){Width=170,DisplayMemberPath="Name"};
- readonly TextBox profileName=new(){Width=150,FontSize=14};
- readonly TextBlock status=new(){Foreground=Brushes.LightGray,FontSize=12};
- bool refreshing;
- public SplitEditor(RouterViewModel model,Source source,DataTemplate receiverTemplate,Action close){
+ readonly StackPanel groups = new();
+ readonly StackPanel pinnedProfiles = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+ readonly TextBlock status = new() { Foreground = Brushes.LightGray, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+ public Grid ProfileBar { get; } = new() { Height = 42 };
+ public StackPanel ReceiverHeadingActions { get; } = new() { Orientation = Orientation.Horizontal };
+ List<SplitProfile> Profiles => model.State.SplitProfiles[source.Id];
+
+ public SplitEditor(RouterViewModel model,Source source,Action close){
   this.model=model;this.source=source;DataContext=model;
-  var root=new Grid{Margin=new Thickness(0,12,0,0)};Content=root;
-  root.RowDefinitions.Add(new(){Height=GridLength.Auto});root.RowDefinitions.Add(new());
-  var top=new WrapPanel{Margin=new Thickness(0,0,24,14)};root.Children.Add(top);
-  void ActionButton(string text,Action action){var b=new Button{Content=text,FontSize=13,Padding=new Thickness(12,7,12,7),Margin=new Thickness(0,0,10,0)};b.Click+=(_,_)=>action();top.Children.Add(b);}
-  ActionButton("← Routing",close);
-  top.Children.Add(new TextBlock{Text=source.Name,FontSize=20,Margin=new Thickness(0,0,16,0),VerticalAlignment=VerticalAlignment.Center});
-  top.Children.Add(profiles);top.Children.Add(profileName);
-  profileName.TextChanged+=(_,_)=>{if(!refreshing&&model.EditingSplit!=null){model.EditingSplit.Name=profileName.Text;model.Save();}};
-  profiles.SelectionChanged+=(_,_)=>{if(!refreshing&&profiles.SelectedItem is SplitProfile p){model.EditSplit(source,p);Render();}};
-  ActionButton("+ Profil",()=>{var p=new SplitProfile();model.State.SplitProfiles[source.Id].Add(p);model.EditSplit(source,p);Render();});
-  ActionButton("Domyślny",()=>{model.State.DefaultSplitIds[source.Id]=model.EditingSplit!.Id;model.Save();Render();});
-  ActionButton("Włącz / wyłącz",()=>{
-   var id=model.EditingSplit!.Id;
-   if(model.ActiveCard.SplitIds.GetValueOrDefault(source.Id)==id)model.ActiveCard.SplitIds.Remove(source.Id);else model.ActiveCard.SplitIds[source.Id]=id;
-   model.Save();Render();
-  });
-  top.Children.Add(status);
-  var body=new Grid();Grid.SetRow(body,1);root.Children.Add(body);
-  body.ColumnDefinitions.Add(new(){Width=new GridLength(30,GridUnitType.Star)});body.ColumnDefinitions.Add(new(){Width=new GridLength(40)});body.ColumnDefinitions.Add(new(){Width=new GridLength(70,GridUnitType.Star)});
-  var left=new DockPanel();body.Children.Add(left);
+  BuildProfileBar();
+
+  var left = new DockPanel();
+  Content = left;
+  var back = new Button { Content = "← Routing", HorizontalAlignment = HorizontalAlignment.Stretch, Height = 40, Margin = new Thickness(0, 14, 0, 20), FontSize = 14 };
+  back.Click += (_, _) => close();
+  DockPanel.SetDock(back, Dock.Top);
+  left.Children.Add(back);
   var add=new Button{Content="+ Grupa",HorizontalAlignment=HorizontalAlignment.Stretch,Margin=new Thickness(0,12,0,10),FontSize=14};
   DockPanel.SetDock(add,Dock.Bottom);left.Children.Add(add);
   add.Click+=(_,_)=>{int number=1;while(model.EditingSplit!.Groups.Any(item=>item.Name=="Warstwa "+number))number++;var g=new SplitGroup{Name="Warstwa "+number};model.EditingSplit.Groups.Add(g);model.SelectSplitGroup(g);model.Save();RenderGroups();};
-  left.Children.Add(new ScrollViewer{Content=groups,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,PanningMode=PanningMode.VerticalOnly});
-  var right=new DockPanel();Grid.SetColumn(right,2);body.Children.Add(right);
-  var title=new TextBlock{Text="ODBIORCY",FontSize=27,Margin=new Thickness(0,0,0,20)};DockPanel.SetDock(title,Dock.Top);right.Children.Add(title);
-  var receiverSections=new StackPanel();
-  foreach(var pair in new[]{("RACK","Rack"),("KEYBOARDS","Keyboards"),("ON TOP","OnTop")}){
-   var items=new ItemsControl{ItemTemplate=receiverTemplate};
-   items.SetBinding(ItemsControl.ItemsSourceProperty,pair.Item2);
-   var factory=new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.UniformGrid));factory.SetValue(System.Windows.Controls.Primitives.UniformGrid.ColumnsProperty,2);
-   items.ItemsPanel=new ItemsPanelTemplate(factory);
-   receiverSections.Children.Add(new Expander{Header=pair.Item1,IsExpanded=true,Content=items,Style=Application.Current.MainWindow?.TryFindResource("TagSection") as Style});
-  }
-  right.Children.Add(new ScrollViewer{Content=receiverSections,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,PanningMode=PanningMode.VerticalOnly});
+  left.Children.Add(CreatePanelScroll(groups));
+  var toggleProfile = new Button { Content = "Włącz / wyłącz", FontSize = 14, Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 0, 10, 0) };
+  if (Application.Current.MainWindow?.TryFindResource("RectangularButton") is Style style)
+   toggleProfile.Style = style;
+  toggleProfile.Click += (_, _) => { model.ToggleSplit(source, model.EditingSplit!); Render(); };
+  status.MaxWidth = 180;
+  status.TextTrimming = TextTrimming.CharacterEllipsis;
+  ReceiverHeadingActions.Children.Add(toggleProfile);
+  ReceiverHeadingActions.Children.Add(status);
   Render();
  }
- void Render(){
-  refreshing=true;profiles.ItemsSource=null;profiles.ItemsSource=model.State.SplitProfiles[source.Id];profiles.SelectedItem=model.EditingSplit;profileName.Text=model.EditingSplit!.Name;refreshing=false;
-  status.Text=(model.State.DefaultSplitIds.GetValueOrDefault(source.Id)==model.EditingSplit.Id?"Domyślny · ":"")+(model.ActiveCard.SplitIds.GetValueOrDefault(source.Id)==model.EditingSplit.Id?"Włączony":"Wyłączony");
+ static ScrollViewer CreatePanelScroll(object content)
+ {
+  var scroll = new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+  if (Application.Current.MainWindow?.TryFindResource("PanelScroll") is Style style)
+   scroll.Style = style;
+  return scroll;
+ }
+
+ Button ProfileButton(string label, Action click)
+ {
+  var button = new Button { Content = label, Height = 36, FontSize = 14, Padding = new Thickness(14, 6, 14, 6) };
+  if (Application.Current.MainWindow?.TryFindResource("FlatCardButton") is Style style)
+   button.Style = style;
+  button.Click += (_, _) => click();
+  return button;
+ }
+
+ void BuildProfileBar()
+ {
+  ProfileBar.ColumnDefinitions.Add(new ColumnDefinition());
+  ProfileBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+  ProfileBar.Children.Add(new ScrollViewer
+  {
+   Content = pinnedProfiles,
+   HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+   VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+   PanningMode = PanningMode.HorizontalOnly,
+   Margin = new Thickness(0, 0, 16, 0)
+  });
+  var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+  Grid.SetColumn(actions, 1);
+  ProfileBar.Children.Add(actions);
+  actions.Children.Add(ProfileButton("Lista", () =>
+   new CardCatalogWindow(Profiles, SelectProfile, SetPinned, ExportProfile) { Owner = Window.GetWindow(this) }.ShowDialog()));
+  actions.Children.Add(ProfileButton("Zapisz", SaveProfile));
+  actions.Children.Add(ProfileButton("+ Dodaj", AddProfile));
+ }
+
+ void SelectProfile(SplitProfile profile)
+ {
+  model.EditSplit(source, profile);
+  Render();
+ }
+
+ void SetPinned(SplitProfile profile, bool pinned)
+ {
+  var previous = profile.IsPinned;
+  profile.IsPinned = pinned;
+  if (!model.Save()) profile.IsPinned = previous;
+  RenderPinnedProfiles();
+ }
+
+ void SaveProfile()
+ {
+  var profile = model.EditingSplit!;
+  new RenameWindow(profile.Name, name =>
+  {
+   var previous = profile.Name;
+   profile.Name = name;
+   if (!model.Save())
+   {
+    profile.Name = previous;
+    throw new InvalidOperationException(model.Status);
+   }
+   Render();
+  }) { Owner = Window.GetWindow(this), Title = "Zapisz Split" }.ShowDialog();
+ }
+
+ void AddProfile()
+ {
+  var profile = new SplitProfile { Name = RouterViewModel.NextSplitName(Profiles) };
+  Profiles.Add(profile);
+  SelectProfile(profile);
+ }
+
+ void ExportProfile(SplitProfile profile) =>
+  StudioFileDialogs.Export(Window.GetWindow(this), profile.Name, () => StudioFiles.ExportSplit(model, source, profile));
+
+ void RenderPinnedProfiles()
+ {
+  pinnedProfiles.Children.Clear();
+  foreach (var profile in Profiles.Where(profile => profile.IsPinned))
+  {
+   var button = ProfileButton(profile.Name, () => SelectProfile(profile));
+   if (pinnedProfiles.Children.Count == 0) button.BorderThickness = new Thickness(0);
+   if (profile == model.EditingSplit) button.Background = new SolidColorBrush(Color.FromRgb(35, 74, 56));
+   SceneMenu.Attach(button, () => profile.IsPinned, pinned => SetPinned(profile, pinned), export: () => ExportProfile(profile));
+   pinnedProfiles.Children.Add(button);
+  }
+ }
+
+ void Render()
+ {
+  var profile = model.EditingSplit!;
+  status.Text = profile.Name + (model.ActiveCard.SplitIds.GetValueOrDefault(source.Id) == profile.Id ? " · Włączony" : " · Wyłączony");
+  RenderPinnedProfiles();
   RenderGroups();
  }
  public static string NoteName(int n)=>new[]{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}[n%12]+(n/12-1);
@@ -69,7 +150,7 @@ public sealed class SplitEditor : UserControl {
   groups.Children.Clear();
   foreach(var group in model.EditingSplit!.Groups){
    var panel=new StackPanel{Margin=new Thickness(12)};
-   var border=new Border{Background=new SolidColorBrush(Color.FromRgb(38,43,50)),CornerRadius=new CornerRadius(14),Margin=new Thickness(0,0,0,10),BorderThickness=new Thickness(2),BorderBrush=group==model.EditingGroup?new SolidColorBrush(Color.FromRgb(53,203,125)):Brushes.Transparent,Child=panel};
+   var border=new Border{Background=new SolidColorBrush(Color.FromRgb(38,43,50)),CornerRadius=new CornerRadius(14),Margin=model.Graphics.SourceMargin,BorderThickness=model.Graphics.Outline,BorderBrush=group==model.EditingGroup?new SolidColorBrush(Color.FromRgb(53,203,125)):Brushes.Transparent,Child=panel};
    groups.Children.Add(border);
    var select=new Button{Content=group.Name,HorizontalContentAlignment=HorizontalAlignment.Left,FontSize=16,Background=Brushes.Transparent,Padding=new Thickness(0,4,0,4)};
    var titleTemplate=new ControlTemplate(typeof(Button));
@@ -82,6 +163,8 @@ public sealed class SplitEditor : UserControl {
    titleSurface.AppendChild(titleContent);titleTemplate.VisualTree=titleSurface;select.Template=titleTemplate;
    select.Click+=(_,_)=>{model.SelectSplitGroup(group);RenderGroups();};panel.Children.Add(select);
    var nameHost=new Grid{Height=32};
+   nameHost.ColumnDefinitions.Add(new ColumnDefinition());
+   nameHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
    panel.Children.Remove(select);panel.Children.Add(nameHost);nameHost.Children.Add(select);
    select.Padding=new Thickness(0);select.VerticalAlignment=VerticalAlignment.Center;
    var rename=new TextBox{Text=group.Name,FontSize=16,Visibility=Visibility.Collapsed,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(0),VerticalAlignment=VerticalAlignment.Center};
@@ -89,6 +172,28 @@ public sealed class SplitEditor : UserControl {
    var editContent=new FrameworkElementFactory(typeof(ScrollViewer));editContent.Name="PART_ContentHost";
    editTemplate.VisualTree=editContent;rename.Template=editTemplate;rename.FocusVisualStyle=null;
    nameHost.Children.Add(rename);
+   var toggle = new Button { FontSize = 12, Padding = new Thickness(10, 4, 10, 4), Margin = new Thickness(8, 0, 0, 0), MinWidth = 54 };
+   Grid.SetColumn(toggle, 1);
+   nameHost.Children.Add(toggle);
+   var settings = new StackPanel();
+   panel.Children.Add(settings);
+
+   void UpdateGroupAppearance()
+   {
+    toggle.Content = group.IsEnabled ? "Wł." : "Wył.";
+    toggle.ToolTip = group.IsEnabled ? "Wyłącz grupę" : "Włącz grupę";
+    System.Windows.Automation.AutomationProperties.SetName(toggle, toggle.ToolTip.ToString()!);
+    border.Opacity = group.IsEnabled ? 1 : .55;
+    border.BorderBrush = group != model.EditingGroup ? Brushes.Transparent
+     : group.IsEnabled ? new SolidColorBrush(Color.FromRgb(53, 203, 125)) : Brushes.Gray;
+    settings.Opacity = group.IsEnabled ? 1 : .75;
+   }
+   toggle.Click += (_, _) =>
+   {
+    model.SetSplitGroupEnabled(group, !group.IsEnabled);
+    UpdateGroupAppearance();
+   };
+   UpdateGroupAppearance();
    bool cancelRename=false;
    void FinishRename(){
     if(rename.Visibility!=Visibility.Visible)return;
@@ -114,11 +219,10 @@ public sealed class SplitEditor : UserControl {
    border.Unloaded+=(_,_)=>hold.Stop();
    hold.Tick+=(_,_)=>{hold.Stop();held=true;OpenMenu();};
 
-   panel.Children.Add(new TextBlock{Text="Typ",FontSize=12,Foreground=Brushes.LightSlateGray,Margin=new Thickness(0,4,0,4)});
    var type=new ComboBox{ItemsSource=SplitGroup.Types,SelectedItem=group.Type,MaxDropDownHeight=360};
    type.SelectionChanged+=(_,_)=>{group.Type=type.SelectedItem?.ToString()??"Zakres klawiszy";model.Save();RenderGroups();};
-   panel.Children.Add(type);
-   var keyboard=new Canvas{Height=32,ClipToBounds=true,Margin=new Thickness(0,8,0,8)};keyboard.Visibility=group.Type=="Zakres klawiszy"?Visibility.Visible:Visibility.Collapsed;panel.Children.Add(keyboard);
+   settings.Children.Add(type);
+   var keyboard=new Canvas{Height=32,ClipToBounds=true,Margin=new Thickness(0,8,0,8)};keyboard.Visibility=group.Type=="Zakres klawiszy"?Visibility.Visible:Visibility.Collapsed;settings.Children.Add(keyboard);
    void Draw(){
     keyboard.Children.Clear();
     bool IsBlack(int n)=>new[]{1,3,6,8,10}.Contains(n%12);
@@ -138,8 +242,8 @@ public sealed class SplitEditor : UserControl {
    }
    keyboard.SizeChanged+=(_,_)=>Draw();
    void Range(string label,int low,int high,int min,int max,Action<int,int> set,bool notes=false){
-    panel.Children.Add(new TextBlock{Text=label,FontSize=12,Foreground=Brushes.LightSlateGray,Margin=new Thickness(0,6,0,4)});
-    var row=new Grid();row.ColumnDefinitions.Add(new());row.ColumnDefinitions.Add(new(){Width=new GridLength(12)});row.ColumnDefinitions.Add(new());panel.Children.Add(row);
+    settings.Children.Add(new TextBlock{Text=label,FontSize=12,Foreground=Brushes.LightSlateGray,Margin=new Thickness(0,6,0,4)});
+    var row=new Grid();row.ColumnDefinitions.Add(new());row.ColumnDefinitions.Add(new(){Width=new GridLength(12)});row.ColumnDefinitions.Add(new());settings.Children.Add(row);
     if(!notes){
      var lowBox=new TextBox{Text=low.ToString(),FontSize=14};
      var highBox=new TextBox{Text=high.ToString(),FontSize=14};

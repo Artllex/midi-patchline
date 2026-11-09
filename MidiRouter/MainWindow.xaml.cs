@@ -11,7 +11,7 @@ public partial class MainWindow : Window
  PreviewKeyUp+=(_,_)=>UpdateControlSelection();
  Activated+=(_,_)=>UpdateControlSelection();
  Deactivated+=(_,_)=>Model.SetControlSelection(false);
- Model.PropertyChanged+=(_,args)=>{if(args.PropertyName=="ActiveCard"&&SplitHost.Visibility==Visibility.Visible){Model.CloseSplit();SplitHost.Content=null;SplitHost.Visibility=Visibility.Collapsed;MainRouting.Visibility=Visibility.Visible;}};
+ Model.PropertyChanged+=(_,args)=>{if(args.PropertyName=="ActiveCard"&&SplitHost.Visibility==Visibility.Visible){CloseSplitView();}};
 
 Closing+=(_,_)=>Model.Save();Loaded+=(_,_)=>RestoreSectionOrder();}
  private void UpdateControlSelection()=>Model.SetControlSelection((Keyboard.Modifiers&ModifierKeys.Control)!=0);
@@ -24,7 +24,7 @@ Closing+=(_,_)=>Model.Save();Loaded+=(_,_)=>RestoreSectionOrder();}
   wheelLastTick=Environment.TickCount64;wheelTimer.Start();e.Handled=true;
  }
  private void WheelTick(object? sender,EventArgs e){
-  if(wheelViewer==null||!IsVisible){wheelTimer.Stop();return;}var now=Environment.TickCount64;double dt=Math.Clamp(now-wheelLastTick,1,64);wheelLastTick=now;
+  if(wheelViewer==null||!wheelViewer.IsVisible||!IsVisible){wheelTimer.Stop();return;}var now=Environment.TickCount64;double dt=Math.Clamp(now-wheelLastTick,1,64);wheelLastTick=now;
   wheelTarget=Math.Clamp(wheelTarget,0,wheelViewer.ScrollableHeight);double remaining=wheelTarget-wheelViewer.VerticalOffset;
   if(Math.Abs(remaining)<.4){wheelViewer.ScrollToVerticalOffset(wheelTarget);wheelTimer.Stop();return;}
   wheelViewer.ScrollToVerticalOffset(wheelViewer.VerticalOffset+remaining*(1-Math.Exp(-dt/55)));
@@ -133,24 +133,38 @@ Closing+=(_,_)=>Model.Save();Loaded+=(_,_)=>RestoreSectionOrder();}
   receiverClickSnapshot=Model.EditingRoutes.Select(route=>new Route{SourceId=route.SourceId,ReceiverId=route.ReceiverId,Octaves=route.Octaves}).ToList();
   clickSource=Model.State.SelectedSourceId;clickCard=Model.State.ActiveCardId;clickReceiver=receiver;
  }
- private void OpenSplit(Source source){
-  Model.EditSplit(source);MainRouting.Visibility=Visibility.Collapsed;SplitHost.Visibility=Visibility.Visible;
-  SplitHost.Content=new SplitEditor(Model,source,(DataTemplate)FindResource("ReceiverRow"),()=>{
-   Model.CloseSplit();SplitHost.Visibility=Visibility.Collapsed;SplitHost.Content=null;MainRouting.Visibility=Visibility.Visible;
-  });
+ private void OpenSplit(Source source)
+ {
+  Model.EditSplit(source);
+  var editor = new SplitEditor(Model, source, CloseSplitView);
+  SplitHost.Content = editor;
+  SplitProfileHost.Content = editor.ProfileBar;
+  SplitReceiverActions.Content = editor.ReceiverHeadingActions;
+  SplitSourceName.Text = source.Name;
+  SplitSourceName.ToolTip = source.Name;
+  SourcePanel.Visibility = SceneBar.Visibility = AddReceiverButton.Visibility = Visibility.Collapsed;
+  SplitHost.Visibility = SplitBar.Visibility = SplitSourceName.Visibility = SplitReceiverActions.Visibility = Visibility.Visible;
+ }
+
+ private void CloseSplitView()
+ {
+  Model.CloseSplit();
+  SplitHost.Content = SplitProfileHost.Content = SplitReceiverActions.Content = null;
+  SplitHost.Visibility = SplitBar.Visibility = SplitSourceName.Visibility = SplitReceiverActions.Visibility = Visibility.Collapsed;
+  SourcePanel.Visibility = SceneBar.Visibility = AddReceiverButton.Visibility = Visibility.Visible;
  }
  private void SplitClick(object sender,RoutedEventArgs e){
   if(sender is FrameworkElement{DataContext:Source source} button){
-   if(button.Tag?.ToString()=="held"){button.Tag=null;return;}
-   if(!Model.ToggleDefaultSplit(source))OpenSplit(source);
+   if(button.Tag?.ToString()=="held"){button.Tag="ready";return;}
+   OpenSplit(source);
   }
  }
  private void SplitButtonLoaded(object sender,RoutedEventArgs e){
-  if(sender is not FrameworkElement button||button.ToolTip?.ToString()=="Split · gotowy")return;
-  button.ToolTip="Split · gotowy";
+  if(sender is not FrameworkElement button||button.Tag?.ToString()=="ready")return;
+  button.Tag="ready";
   var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(650)};
   Point origin=new();bool pressing=false;
-  void Begin(Point point){origin=point;pressing=true;timer.Start();holdTimer.Stop();}
+  void Begin(Point point){button.Tag="ready";origin=point;pressing=true;timer.Start();holdTimer.Stop();}
   button.PreviewMouseLeftButtonDown+=(_,args)=>{if(args.StylusDevice==null)Begin(args.GetPosition(button));};
   button.PreviewTouchDown+=(_,args)=>Begin(args.GetTouchPoint(button).Position);
   button.PreviewMouseMove+=(_,args)=>{if((args.GetPosition(button)-origin).Length>12){timer.Stop();pressing=false;}};
@@ -161,7 +175,6 @@ Closing+=(_,_)=>Model.Save();Loaded+=(_,_)=>RestoreSectionOrder();}
   timer.Tick+=(_,_)=>{timer.Stop();if(pressing&&button.DataContext is Source source){button.Tag="held";OpenSplit(source);}};
  }
  private void SourceMouseDown(object sender,MouseButtonEventArgs e){if(e.ClickCount==2&&sender is FrameworkElement{DataContext:Source source}){Model.ChooseSource(source,true);e.Handled=true;}}
- private void OpenGeneralSettings(object sender,RoutedEventArgs e)=>new GeneralSettingsWindow(Model){Owner=this}.ShowDialog();
  private void SceneLoaded(object sender,RoutedEventArgs e){
   if(sender is FrameworkElement{DataContext:RoutingCard card} target && target.Tag?.ToString()!="scene-menu"){
    target.Tag="scene-menu";SceneMenu.Attach(target,Model,card);

@@ -24,30 +24,61 @@ public static class ModelChecks
         Check(parameterGroup.ParameterRange[1]==16383,"Pitch Bend 14 bit range");
         var splits=new RouterViewModel(Path.Combine(dir,"splits.json"));
         var splitSource=splits.Sources[0];
-        Check(!splits.ToggleDefaultSplit(splitSource),"Missing default opens split editor");
         splits.EditSplit(splitSource);
         var profile=splits.EditingSplit!;
-        var splitView=new SplitEditor(splits,splitSource,new System.Windows.DataTemplate(),()=>{});
+        var splitView=new SplitEditor(splits,splitSource,()=>{});
         splitView.Measure(new System.Windows.Size(1300,700));
         Check(splitView.DesiredSize.Width>0,"Split editor layout");
         splits.SelectSplitGroup(profile.Groups[0]);splits.ToggleReceiver.Execute(splits.Receivers[0]);
         splits.SelectSplitGroup(profile.Groups[1]);splits.ToggleReceiver.Execute(splits.Receivers[1]);
-        splits.State.DefaultSplitIds[splitSource.Id]=profile.Id;
         splits.CloseSplit();
-        Check(splits.ToggleDefaultSplit(splitSource),"Default split activation");
+        splits.ToggleSplit(splitSource,profile);
         Check(splits.RoutesForNote("a",40,100,0).Single().ReceiverId=="jp","Lower split routes");
         Check(splits.RoutesForNote("a",70,100,0).Single().ReceiverId=="virus","Upper split routes");
         profile.Groups[0].High=80;
         Check(splits.RoutesForNote("a",70,100,0).Count()==2,"Overlapping split layers");
+        splits.SetSplitGroupEnabled(profile.Groups[0],false);
+        Check(splits.RoutesForNote("a",70,100,0).Single().ReceiverId=="virus","Disabled Split layer does not route");
+        var disabledSplit=new RouterViewModel(Path.Combine(dir,"splits.json"));
+        Check(!disabledSplit.State.SplitProfiles["a"][0].Groups[0].IsEnabled,"Disabled Split layer persists");
+        splits.SetSplitGroupEnabled(profile.Groups[0],true);
+        Check(splits.RoutesForNote("a",70,100,0).Count()==2,"Re-enabling Split restores its routes");
         profile.Groups[0].Type="Velocity";profile.Groups[0].VelocityHigh=50;
         Check(splits.RoutesForNote("a",70,100,0).Count()==1,"Split velocity condition");
         profile.Groups[1].Type="Modwheel";profile.Groups[1].ModLow=64;
         Check(!splits.RoutesForNote("a",70,100,0).Any(),"Split modwheel condition");
         splits.Save();
         var splitReload=new RouterViewModel(Path.Combine(dir,"splits.json"));
-        Check(splitReload.State.SplitProfiles["a"].Count==1&&splitReload.State.DefaultSplitIds["a"]==profile.Id,"Split persistence");
+        Check(splitReload.State.SplitProfiles["a"].Count==1,"Split persistence");
         Check(splitReload.ActiveCard.SplitIds["a"]==profile.Id,"Active split persists in scene");
-        splits.ToggleDefaultSplit(splitSource);
+
+        var studioFile = Path.Combine(dir, "test.patchline.json");
+        StudioFiles.Write(studioFile, splits.State);
+        var target = new RouterViewModel(Path.Combine(dir, "target.json"));
+        Check(target.ReplaceStudio(RouterViewModel.ReadStudio(studioFile)) &&
+            target.ActiveCard.SplitIds["a"] == profile.Id, "Open saved studio with active Split");
+        Check(target.ReplaceStudio(RouterViewModel.NewStudio()) &&
+            target.ActiveCard.Routes.Count == 0 && target.State.SplitProfiles.Count == 0, "New studio clears routing");
+
+        var sceneFile = Path.Combine(dir, "scene.patchline-export.json");
+        StudioFiles.Write(sceneFile, StudioFiles.ExportScene(splits, splits.ActiveCard));
+        target.State.Endpoints.Single(endpoint => endpoint.Id == "jp").Name = "Existing receiver";
+        var merged = StudioFiles.Merge(target, StudioFiles.ReadExchange(sceneFile));
+        var imported = merged.Cards.Last();
+        var importedSplit = merged.SplitProfiles["a"].Single();
+        var remappedReceiver = imported.Routes.First(route => route.ReceiverId != "virus").ReceiverId;
+        Check(merged.Cards.Count == 2 && imported.Name != target.ActiveCard.Name && importedSplit.Id == imported.SplitIds["a"],
+            "Scene import adds dependent profile and resolves name collision");
+        Check(remappedReceiver != "jp" && merged.Endpoints.Single(endpoint => endpoint.Id == "jp").Name == "Existing receiver" &&
+            importedSplit.Groups[0].Routes.Single().ReceiverId == remappedReceiver, "Import remaps receiver collision consistently");
+        Check(target.ReplaceStudio(merged), "Imported scene can be loaded");
+
+        var splitFile = Path.Combine(dir, "split.patchline-export.json");
+        StudioFiles.Write(splitFile, StudioFiles.ExportSplit(splits, splitSource, profile));
+        var mergedProfile = StudioFiles.Merge(target, StudioFiles.ReadExchange(splitFile));
+        Check(mergedProfile.Cards.Count == target.Cards.Count && mergedProfile.SplitProfiles["a"].Count == 2,
+            "Standalone Split import adds a profile without adding a scene");
+        splits.ToggleSplit(splitSource,profile);
         Check(splits.RoutesForNote("a",70,100,0).Count()==2,"Disable split restores routing");
 
         var ctrlModel=new RouterViewModel(Path.Combine(dir,"ctrl.json"));
