@@ -35,7 +35,7 @@ public sealed class GeneralSettingsWindow : Window
         layout.Children.Add(tabs);
         StackPanel Tab(string title)
         {
-            var content = new StackPanel { Margin = new Thickness(0, 4, 12, 0) };
+            var content = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
             tabs.Items.Add(new TabItem
             {
                 Header = title,
@@ -54,6 +54,41 @@ public sealed class GeneralSettingsWindow : Window
         general.Children.Add(new TextBlock { Text = "Język", FontSize = 16, Margin = new Thickness(0, 0, 0, 8) });
         var language = new ComboBox { ItemsSource = L.LanguageLabels, SelectedIndex = Math.Max(0, Array.IndexOf(L.LanguageCodes, model.State.Language)), Width = 230, HorizontalAlignment = HorizontalAlignment.Left };
         general.Children.Add(language);
+        var sources = new OrganizationEditor("Źródła", model.State.VisibleSourceIds.Select(id => model.Sources.FirstOrDefault(source => source.Id == id))
+            .OfType<Source>().Select(source => new OrganizationEditor.Item { Id = source.Id, Name = source.Name, Visible = !model.State.HiddenSourceIds.Contains(source.Id) }));
+        var receivers = new OrganizationEditor("Odbiorcy", model.State.Endpoints.Select(endpoint =>
+            new OrganizationEditor.Item { Id = endpoint.Id, Name = endpoint.Name, Visible = !endpoint.Hidden }));
+        var sourceTags = new OrganizationEditor("Tagi źródeł", model.Sources.Where(source => model.State.VisibleSourceIds.Contains(source.Id))
+            .SelectMany(source => source.Tags.Count == 0 ? new[] { "Bez tagów" } : source.Tags.AsEnumerable()).Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(tag => { int i = model.State.SourceSectionOrder.IndexOf(tag); return i < 0 ? int.MaxValue : i; })
+            .Select(tag => new OrganizationEditor.Item { Id = tag, Name = tag, Visible = !model.State.HiddenSourceTags.Contains(tag) }));
+        var receiverTags = new OrganizationEditor("Tagi odbiorców", model.State.Endpoints
+            .SelectMany(endpoint => endpoint.Tags is { Count: > 0 } tags ? tags : new List<string> { "Bez tagów" }).Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(tag => { int i = model.State.SectionOrder.IndexOf(tag); return i < 0 ? int.MaxValue : i; })
+            .Select(tag => new OrganizationEditor.Item { Id = tag, Name = tag, Visible = !model.State.HiddenReceiverTags.Contains(tag) }));
+        sources.GroupBy(sourceTags, (item, tag) =>
+        {
+            var tags = model.Sources.Single(source => source.Id == item.Id).Tags;
+            return tags.Count == 0 ? tag == "Bez tagów" : tags.Contains(tag, StringComparer.OrdinalIgnoreCase);
+        });
+        receivers.GroupBy(receiverTags, (item, tag) =>
+        {
+            var tags = model.State.Endpoints.Single(endpoint => endpoint.Id == item.Id).Tags;
+            return tags == null || tags.Count == 0 ? tag == "Bez tagów" : tags.Contains(tag, StringComparer.OrdinalIgnoreCase);
+        });
+        general.Children.Add(new TextBlock { Text = "Layout", FontSize = 16, Margin = new Thickness(0, 18, 0, 8) });
+        var organization = new TabControl { Margin = new Thickness(0), FontSize = 14 };
+        var tagOrder = new StackPanel();
+        tagOrder.Children.Add(sourceTags);
+        tagOrder.Children.Add(receiverTags);
+        var objectOrder = new StackPanel();
+        objectOrder.Children.Add(sources);
+        objectOrder.Children.Add(receivers);
+        organization.Items.Add(new TabItem { Header = "Tagi", Content = tagOrder });
+        organization.Items.Add(new TabItem { Header = "Obiekty", Content = objectOrder });
+        organization.SelectedIndex = 0;
+        general.Children.Add(organization);
+
         panel.Children.Add(new TextBlock { Text = "Główny interfejs MIDI", FontSize = 16, Margin = new Thickness(0, 0, 0, 8) });
         var options = MidiPorts.Outputs(model.State.MainInterface);
         options.RemoveAll(p => p.Value == "");
@@ -135,6 +170,30 @@ public sealed class GeneralSettingsWindow : Window
                 error.Text = model.Status;
                 return false;
             }
+            var state = model.State;
+            var oldSources = state.VisibleSourceIds;
+            var oldHidden = state.HiddenSourceIds;
+            var oldEndpoints = state.Endpoints;
+            var oldSourceTags = state.SourceSectionOrder;
+            var oldReceiverTags = state.SectionOrder;
+            var oldHiddenSourceTags = state.HiddenSourceTags;
+            var oldHiddenReceiverTags = state.HiddenReceiverTags;
+            state.VisibleSourceIds = sources.Items.Select(item => item.Id).ToList();
+            state.HiddenSourceIds = sources.Items.Where(item => !item.Visible).Select(item => item.Id).ToList();
+            state.Endpoints = receivers.Items.Select(item => { var endpoint = oldEndpoints.Single(value => value.Id == item.Id).Copy(); endpoint.Hidden = !item.Visible; return endpoint; }).ToList();
+            state.SourceSectionOrder = sourceTags.Items.Select(item => item.Id).ToList();
+            state.SectionOrder = receiverTags.Items.Select(item => item.Id).ToList();
+            state.HiddenSourceTags = sourceTags.Items.Where(item => !item.Visible).Select(item => item.Id).ToList();
+            state.HiddenReceiverTags = receiverTags.Items.Where(item => !item.Visible).Select(item => item.Id).ToList();
+            if (!model.Save())
+            {
+                state.VisibleSourceIds = oldSources; state.HiddenSourceIds = oldHidden; state.Endpoints = oldEndpoints;
+                state.SourceSectionOrder = oldSourceTags; state.SectionOrder = oldReceiverTags;
+                state.HiddenSourceTags = oldHiddenSourceTags; state.HiddenReceiverTags = oldHiddenReceiverTags;
+                error.Text = model.Status;
+                return false;
+            }
+            model.RefreshOrganization();
             error.Text = "";
             return true;
         }

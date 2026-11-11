@@ -3,7 +3,7 @@ namespace MidiRouter;
 
 public sealed partial class RouterViewModel
 {
-    public IEnumerable<Source> PrimarySources => Sources.Where(s => State.VisibleSourceIds.Contains(s.Id));
+    public IEnumerable<Source> PrimarySources => State.VisibleSourceIds.Select(id => Sources.FirstOrDefault(s => s.Id == id)).OfType<Source>().Where(s => !State.HiddenSourceIds.Contains(s.Id));
     private string searchText = "";
     public string SearchText
     {
@@ -33,7 +33,7 @@ public sealed partial class RouterViewModel
         var matchingSources = PrimarySources.Where(s => MatchesSearch(s.Name, s.Tags)).ToList();
         var tags = PrimarySources.SelectMany(s => s.Tags.Count == 0 ? new[] { "Bez tagów" } : s.Tags.AsEnumerable()).Distinct(StringComparer.OrdinalIgnoreCase);
         SourceSections = tags.Select(tag => new SourceSection { Name = tag, Sources = matchingSources.Where(s => tag == "Bez tagów" ? s.Tags.Count == 0 : s.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)).ToList(), IsExpanded = !expanded.TryGetValue(tag, out var value) || value })
-            .Where(s => s.Sources.Count > 0).OrderBy(s => { int index = State.SourceSectionOrder.FindIndex(t => t.Equals(s.Name, StringComparison.OrdinalIgnoreCase)); return index < 0 ? int.MaxValue : index; }).ToList();
+            .Where(s => s.Sources.Count > 0 && !State.HiddenSourceTags.Contains(s.Name)).OrderBy(s => { int index = State.SourceSectionOrder.FindIndex(t => t.Equals(s.Name, StringComparison.OrdinalIgnoreCase)); return index < 0 ? int.MaxValue : index; }).ToList();
         Changed(nameof(SourceSections));
     }
     public void ReorderSourceSection(string name, int index)
@@ -57,6 +57,7 @@ public sealed partial class RouterViewModel
     private bool Matches(Endpoint e) => MatchesSearch(e.Name, e.Tags) && (ShowHidden || !e.Hidden) && (SelectedTags.Count == 0 || (e.Tags ?? new()).Any(t => SelectedTags.Contains(t)));
     public void RefreshFilter()
     {
+        Changed(nameof(ReceiverTags));
         Changed(nameof(Rack));
         Changed(nameof(Keyboards));
         Changed(nameof(OnTop));

@@ -40,7 +40,7 @@
 </Grid>
 
       <Button Style="{StaticResource OctaveButton}" Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Left" VerticalAlignment="Center" Loaded="SplitButtonLoaded" Click="SplitClick" Width="56" Height="{Binding DataContext.Graphics.SourceControlsHeight, RelativeSource={RelativeSource AncestorType=Window}}" Padding="0" FontSize="22" Background="Transparent" ToolTip="Edytuj Split">
-       <TextBlock Text="/" FontSize="20" Foreground="#DCE3EB" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+       <TextBlock Text="/" FontSize="17" Foreground="#DCE3EB" HorizontalAlignment="Center" VerticalAlignment="Center"/>
       </Button>
      <StackPanel Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Center">
 
@@ -87,7 +87,7 @@
    <Setter Property="Foreground" Value="#F5F5F5" />
    <Setter Property="Margin" Value="0,0,0,10" />
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Expander"><StackPanel>
-    <ToggleButton PreviewMouseLeftButtonDown="SectionMouseDown" PreviewMouseMove="SectionMouseMove" PreviewMouseLeftButtonUp="SectionMouseUp" PreviewTouchDown="SectionTouchDown" PreviewTouchMove="SectionTouchMove" PreviewTouchUp="SectionTouchUp" ToolTip="Przeciągnij, aby zmienić kolejność" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" HorizontalContentAlignment="Left" Margin="0,0,0,10">
+    <ToggleButton PreviewMouseRightButtonUp="SectionContextMenu" PreviewMouseLeftButtonDown="SectionMouseDown" PreviewMouseMove="SectionMouseMove" PreviewMouseLeftButtonUp="SectionMouseUp" PreviewTouchDown="SectionTouchDown" PreviewTouchMove="SectionTouchMove" PreviewTouchUp="SectionTouchUp" ToolTip="Przeciągnij, aby zmienić kolejność" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" HorizontalContentAlignment="Left" Margin="0,0,0,10">
      <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="Transparent" Padding="0,6"><StackPanel Orientation="Horizontal"><TextBlock x:Name="Arrow" Text="▸" Foreground="#DCE3EB" FontSize="24" Width="30" VerticalAlignment="Center" /><ContentPresenter Content="{Binding Header, RelativeSource={RelativeSource AncestorType=Expander}}" TextElement.Foreground="#A5B3C2" VerticalAlignment="Center" TextElement.FontSize="15" TextElement.FontWeight="SemiBold" /></StackPanel></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Arrow" Property="Text" Value="▾" /></Trigger></ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template>
     </ToggleButton>
     <ContentPresenter x:Name="Body" ContentSource="Content" />
@@ -174,15 +174,6 @@
     <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
 <StackPanel Orientation="Horizontal" Height="40" Margin="0,14,20,20"><TextBlock Text="ODBIORCY" FontWeight="SemiBold" FontSize="27" VerticalAlignment="Center" /><Button x:Name="AddReceiverButton" Style="{StaticResource RectangularButton}" Content="+ Dodaj" Click="AddReceiver" Margin="16,0,0,0" Padding="12,6" FontSize="14" /><ContentControl x:Name="SplitReceiverActions" Visibility="Collapsed" Margin="16,0,0,0" VerticalContentAlignment="Stretch"/></StackPanel>
      <ScrollViewer Grid.Row="1" Style="{StaticResource PanelScroll}"><StackPanel x:Name="ReceiverSections">
-     <Expander Visibility="{Binding HasRack, Converter={StaticResource Visible}}" Header="RACK" IsExpanded="True" Style="{StaticResource TagSection}">
-     <ItemsControl ItemsSource="{Binding Rack}" ItemTemplate="{StaticResource ReceiverRow}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl>
-     </Expander>
-     <Expander Visibility="{Binding HasKeyboards, Converter={StaticResource Visible}}" Header="KEYBOARDS" IsExpanded="True" Style="{StaticResource TagSection}">
-     <ItemsControl ItemsSource="{Binding Keyboards}" ItemTemplate="{StaticResource ReceiverRow}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl>
-     </Expander>
-     <Expander Visibility="{Binding HasOnTop, Converter={StaticResource Visible}}" Header="ON TOP" IsExpanded="True" Style="{StaticResource TagSection}">
-     <ItemsControl ItemsSource="{Binding OnTop}" ItemTemplate="{StaticResource ReceiverRow}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl>
-     </Expander>
      <Expander Visibility="{Binding HasHiddenReceivers, Converter={StaticResource Visible}}" Header="Ukryte" Tag="hidden" IsExpanded="False" Style="{StaticResource TagSection}">
       <ItemsControl ItemsSource="{Binding HiddenReceivers}" ItemTemplate="{StaticResource ReceiverRow}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl>
      </Expander>

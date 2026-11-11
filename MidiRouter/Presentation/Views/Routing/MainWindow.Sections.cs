@@ -6,6 +6,46 @@ namespace MidiRouter;
 
 public partial class MainWindow
 {
+    private SectionDragPreview? sectionPreview;
+    private void RenderReceiverSections()
+    {
+        var expanded = ReceiverSections.Children.OfType<Expander>()
+            .Where(section => section.Tag?.ToString() != "hidden")
+            .ToDictionary(section => section.Header.ToString()!, section => section.IsExpanded);
+        var hidden = ReceiverSections.Children.OfType<Expander>().FirstOrDefault(section => section.Tag?.ToString() == "hidden");
+        ReceiverSections.Children.Clear();
+        foreach (var tag in Model.ReceiverTags)
+        {
+            var receivers = Model.ReceiversForTag(tag).ToList();
+            if (receivers.Count == 0) continue;
+            var factory = new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.UniformGrid));
+            factory.SetValue(System.Windows.Controls.Primitives.UniformGrid.ColumnsProperty, 2);
+            var list = new ItemsControl { ItemsSource = receivers, ItemTemplate = (DataTemplate)FindResource("ReceiverRow"),
+                ItemsPanel = new ItemsPanelTemplate(factory) };
+            ReceiverSections.Children.Add(new Expander { Header = tag, Tag = "receiver", IsExpanded = !expanded.TryGetValue(tag, out var value) || value,
+                Style = (Style)FindResource("TagSection"), Content = list });
+        }
+        if (hidden != null) ReceiverSections.Children.Add(hidden);
+    }
+
+    private void SectionContextMenu(object sender, MouseButtonEventArgs e)
+    {
+        var section = FindSection((DependencyObject)sender);
+        if (section == null || section.Tag?.ToString() == "hidden") return;
+        var menu = new ContextMenu { PlacementTarget = section };
+        var hide = new MenuItem { Header = "Ukryj" };
+        hide.Click += (_, _) =>
+        {
+            var tags = section.Tag?.ToString() == "source" ? Model.State.HiddenSourceTags : Model.State.HiddenReceiverTags;
+            if (!tags.Contains(section.Header.ToString()!)) tags.Add(section.Header.ToString()!);
+            Model.Save();
+            Model.RefreshOrganization();
+        };
+        menu.Items.Add(hide);
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
     private Expander? movingSection;
     private FrameworkElement? sectionGrip;
     private Point sectionStart;
@@ -44,7 +84,13 @@ public partial class MainWindow
             return;
         if ((point - sectionStart).Length > 8)
         {
+            if (!sectionDragged)
+            {
+                sectionPreview = new SectionDragPreview((UIElement)Content, movingSection);
+                sectionPreview.Show();
+            }
             sectionDragged = true;
+            if (sectionPreview != null) sectionPreview.Move(TranslatePoint(point, (UIElement)Content));
             movingSection.Opacity = .55;
         }
     }
@@ -54,6 +100,7 @@ public partial class MainWindow
         if (section == null)
             return;
         movingSection = null;
+        if (sectionPreview != null) { sectionPreview.Close(); sectionPreview = null; }
         section.Opacity = 1;
         if (!sectionDragged)
         {

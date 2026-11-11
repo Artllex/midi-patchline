@@ -23,7 +23,8 @@ public partial class MainWindow : Window
         Model.PropertyChanged += (_, args) => { if (args.PropertyName == "ActiveCard" && SplitHost.Visibility == Visibility.Visible) { CloseSplitView(); } };
 
         Closing += (_, _) => Model.Save();
-        Loaded += (_, _) => RestoreSectionOrder();
+        Loaded += (_, _) => { RenderReceiverSections(); RestoreSectionOrder(); };
+        Model.PropertyChanged += (_, args) => { if (args.PropertyName == nameof(Model.ReceiverTags) && IsLoaded) RenderReceiverSections(); };
     }
     private void UpdateControlSelection() => Model.SetControlSelection((Keyboard.Modifiers & ModifierKeys.Control) != 0);
     private void SceneLoaded(object sender, RoutedEventArgs e)

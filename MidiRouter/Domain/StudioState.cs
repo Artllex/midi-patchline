@@ -11,6 +11,9 @@ public sealed class StudioState
     public List<string> SectionOrder { get; set; } = new() { "RACK", "KEYBOARDS", "ON TOP" };
     public List<string> DeletedSourceIds { get; set; } = new();
     public List<string> DeletedReceiverIds { get; set; } = new();
+    public List<string> HiddenSourceIds { get; set; } = new();
+    public List<string> HiddenSourceTags { get; set; } = new();
+    public List<string> HiddenReceiverTags { get; set; } = new();
     public int Version { get; set; } = 1;
     public string SelectedSourceId { get; set; } = "a";
     public string MainInterface { get; set; } = "Windows MIDI";

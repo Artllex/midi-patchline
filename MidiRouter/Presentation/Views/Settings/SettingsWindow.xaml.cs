@@ -3,6 +3,21 @@ namespace MidiRouter;
 
 public partial class SettingsWindow : Window
 {
+    private void MatchSearchHeight()
+    {
+        if (Application.Current.MainWindow is not MainWindow main ||
+            main.FindName("MainSearch") is not FrameworkElement search || search.ActualHeight <= 0) return;
+        double height = search.TransformToAncestor(main).TransformBounds(new Rect(search.RenderSize)).Height / .85;
+        void Visit(DependencyObject root)
+        {
+            if (root is System.Windows.Controls.TextBox box && box.Tag?.ToString() == "match-search-height")
+                box.Height = height;
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+                Visit(System.Windows.Media.VisualTreeHelper.GetChild(root, i));
+        }
+        Visit(this);
+    }
+
     private readonly RouterViewModel model;
     private readonly Source? editingSource;
     public List<EndpointDraft> Drafts { get; }
@@ -22,6 +37,7 @@ public partial class SettingsWindow : Window
                 draft.Interface = model.State.MainInterface;
         }
         InitializeComponent();
+        Loaded += (_, _) => MatchSearchHeight();
         DataContext = Drafts;
         if (adding)
             Title = "Dodaj odbiorcę";
@@ -42,6 +58,7 @@ public partial class SettingsWindow : Window
             draft.Interfaces.Add(model.State.MainInterface);
         Drafts = new() { draft };
         InitializeComponent();
+        Loaded += (_, _) => MatchSearchHeight();
         DataContext = Drafts;
         Title = "Ustawienia źródła";
     }

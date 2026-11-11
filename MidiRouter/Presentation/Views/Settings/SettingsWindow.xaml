@@ -1,4 +1,4 @@
-﻿<Window x:Class="MidiRouter.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<Window x:Class="MidiRouter.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  Title="Ustawienia" Width="620" Height="550" MinWidth="550" MinHeight="410" Background="#181B20" Foreground="#EFF2F5" WindowStartupLocation="CenterOwner">
  <Window.Resources><Style x:Key="ArtworkButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#323A43"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#30463B"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
@@ -8,8 +8,8 @@
  <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" PanningMode="VerticalOnly"><ItemsControl ItemsSource="{Binding}"><ItemsControl.ItemTemplate><DataTemplate>
  <StackPanel Margin="0,0,14,18">
   <Border Background="#222830" CornerRadius="10" Padding="18"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="230"/></Grid.ColumnDefinitions>
-   <StackPanel x:Name="BasicFields" Margin="0,0,20,0"><TextBlock Text="PODSTAWOWE" Style="{StaticResource SectionTitle}"/><TextBlock Text="Nazwa" Style="{StaticResource FieldLabel}"/><TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" MaxLength="100"/>
-    <TextBlock Text="Tagi" Style="{StaticResource FieldLabel}" Margin="0,14,0,5"/><TextBox Text="{Binding TagsText, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Oddziel przecinkami: Rack, KB, Mini, Modular" Foreground="#82909F" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
+   <StackPanel x:Name="BasicFields" Margin="0,0,20,0"><TextBlock Text="PODSTAWOWE" Style="{StaticResource SectionTitle}"/><TextBlock Text="Nazwa" Style="{StaticResource FieldLabel}"/><TextBox Tag="match-search-height" Style="{StaticResource SearchBox}" Height="33" Padding="10,0" FontSize="14" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" MaxLength="100"/>
+    <TextBlock Text="Tagi" Style="{StaticResource FieldLabel}" Margin="0,14,0,5"/><TextBox Tag="match-search-height" Style="{StaticResource SearchBox}" Height="33" Padding="10,0" FontSize="14" Text="{Binding TagsText, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Oddziel przecinkami: Rack, KB, Mini, Modular" Foreground="#82909F" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
     <StackPanel Visibility="{Binding SourceVisibility}" Margin="0,14,0,0">
    <StackPanel Orientation="Horizontal">
     <StackPanel Width="140" Margin="0,0,12,0">

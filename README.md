@@ -4,7 +4,7 @@ Natywna aplikacja Windows w C# / WPF do zarządzania scenami routingu MIDI i Spl
 
 ## Stan
 
-Wersja 0.1.122 — ukończony etap UI — zachowuje dotychczasowy interfejs i zapis konfiguracji. Obsługuje przypisania pojedyncze i wielokrotne (także CTRL), transpozycję, Solo, tagi, ukrywanie urządzeń, sceny, Splity, import/eksport, sześć języków oraz motywy kolorystyczne.
+Wersja 0.1.129 — ukończona makieta UI — zachowuje dotychczasowy interfejs i zapis konfiguracji. Obsługuje przypisania pojedyncze i wielokrotne (także CTRL), transpozycję, Solo, tagi, ukrywanie urządzeń, sceny, Splity, import/eksport, sześć języków oraz motywy kolorystyczne.
 
 Przesyłanie komunikatów MIDI i PANIC nadal są **symulowane** przez MockMidiBackend. Lista portów pochodzi z Windows WinMM; samo wykrycie portu nie oznacza obsługi transmisji.
 

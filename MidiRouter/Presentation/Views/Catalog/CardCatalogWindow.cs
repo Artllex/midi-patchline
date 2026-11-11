@@ -23,9 +23,9 @@ public sealed class CardCatalogWindow : Window
     private CardCatalogWindow(string title, string emptyText, Func<IEnumerable<Entry>> entries)
     {
         Title = title;
-        Width = 480;
+        Width = 390;
         Height = 520;
-        MinWidth = 360;
+        MinWidth = 320;
         MinHeight = 320;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = new SolidColorBrush(Color.FromRgb(24, 27, 32));
