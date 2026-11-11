@@ -1,4 +1,4 @@
-<Window x:Class="MidiRouter.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:MidiRouter" xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework" Title="MIDI Patchline" Icon="pack://application:,,,/Assets/brand.png" Width="1040" Height="680" MinWidth="760" MinHeight="540" Background="#181B20" Foreground="#F5F5F5" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" PreviewTouchMove="TouchMoved" PreviewTouchUp="TouchEnded">
+<Window x:Class="MidiRouter.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:MidiRouter" xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework" Title="MIDI Patchline" Icon="pack://application:,,,/Assets/brand.png" Width="1040" Height="680" MinWidth="760" MinHeight="540" Background="#181B20" Foreground="#F5F5F5" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
  
  <Window.Resources>
   <local:PanelHighlightConverter x:Key="PanelHighlight"/>

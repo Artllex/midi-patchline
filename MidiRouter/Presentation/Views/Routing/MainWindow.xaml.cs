@@ -14,6 +14,8 @@ public partial class MainWindow : Window
         Model = model;
         InitializeComponent();
         DataContext = Model;
+        AddHandler(UIElement.PreviewTouchMoveEvent, new EventHandler<System.Windows.Input.TouchEventArgs>(TouchMoved), true);
+        AddHandler(UIElement.PreviewTouchUpEvent, new EventHandler<System.Windows.Input.TouchEventArgs>(TouchEnded), true);
         PreviewKeyDown += (_, _) => UpdateControlSelection();
         PreviewKeyUp += (_, _) => UpdateControlSelection();
         Activated += (_, _) => UpdateControlSelection();

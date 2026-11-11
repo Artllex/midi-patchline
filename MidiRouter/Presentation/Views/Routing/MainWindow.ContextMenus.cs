@@ -6,7 +6,7 @@ namespace MidiRouter;
 
 public partial class MainWindow
 {
-    private readonly DispatcherTimer holdTimer = new() { Interval = TimeSpan.FromMilliseconds(650) };
+    private readonly DispatcherTimer holdTimer = ScrollGestureGuard.Watch(new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(650) });
     private FrameworkElement? holdItem; private Point holdOrigin; private bool held; private int holdTouchId;
     private void TouchStarted(object sender, TouchEventArgs e)
     {
@@ -20,15 +20,15 @@ public partial class MainWindow
         holdTimer.Tick += HoldElapsed;
         holdTimer.Start();
     }
-    private void TouchMoved(object sender, TouchEventArgs e)
+    private void TouchMoved(object? sender, TouchEventArgs e)
     {
-        if (e.TouchDevice.Id == holdTouchId && holdItem != null && (e.GetTouchPoint(this).Position - holdOrigin).Length > 12)
+        if (e.TouchDevice.Id == holdTouchId && holdItem != null && (e.GetTouchPoint(this).Position - holdOrigin).Length > 8)
         {
             holdTimer.Stop();
             holdItem = null;
         }
     }
-    private void TouchEnded(object sender, TouchEventArgs e)
+    private void TouchEnded(object? sender, TouchEventArgs e)
     {
         if (e.TouchDevice.Id != holdTouchId)
             return;
@@ -51,6 +51,7 @@ public partial class MainWindow
     }
     private void OpenItemMenu(object sender, MouseButtonEventArgs e)
     {
+        if (e.StylusDevice != null) { e.Handled = true; return; }
         ShowItemMenu((FrameworkElement)sender);
         e.Handled = true;
     }

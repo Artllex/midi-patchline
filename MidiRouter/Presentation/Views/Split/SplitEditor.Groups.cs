@@ -102,13 +102,13 @@ public sealed partial class SplitEditor
                 menu.Items.Add(delete);
                 menu.IsOpen = true;
             }
-            border.PreviewMouseRightButtonUp += (_, e) => { OpenMenu(); e.Handled = true; };
-            var hold = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(650) };
+            border.PreviewMouseRightButtonUp += (_, e) => { if (e.StylusDevice != null) { e.Handled = true; return; } OpenMenu(); e.Handled = true; };
+            var hold = ScrollGestureGuard.Watch(new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(650) });
             Point touchOrigin = new();
             bool held = false;
             System.Windows.Input.Stylus.SetIsPressAndHoldEnabled(border, false);
-            border.PreviewTouchDown += (_, e) => { touchOrigin = e.GetTouchPoint(border).Position; held = false; hold.Start(); };
-            border.PreviewTouchMove += (_, e) => { if ((e.GetTouchPoint(border).Position - touchOrigin).Length > 12) hold.Stop(); };
+            border.PreviewTouchDown += (_, e) => { touchOrigin = e.GetTouchPoint(Window.GetWindow(border)).Position; held = false; hold.Start(); };
+            border.PreviewTouchMove += (_, e) => { if ((e.GetTouchPoint(Window.GetWindow(border)).Position - touchOrigin).Length > 8) hold.Stop(); };
             border.PreviewTouchUp += (_, e) => { hold.Stop(); if (held) e.Handled = true; };
             border.Unloaded += (_, _) => hold.Stop();
             hold.Tick += (_, _) => { hold.Stop(); held = true; OpenMenu(); };

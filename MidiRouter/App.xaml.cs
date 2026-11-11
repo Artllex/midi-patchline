@@ -10,6 +10,7 @@ public partial class App : Application
         base.OnStartup(e);
         UiPresentation.Initialize();
         ScrollBehavior.Initialize();
+        ScrollGestureGuard.Initialize();
         pointer = new PointerVisibilityController();
         if (DiagnosticBridge.TryRun(this, e.Args))
             return;

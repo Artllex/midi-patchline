@@ -11,7 +11,7 @@ public static class SceneMenu
 
     public static void Attach(FrameworkElement target, Func<bool> isPinned, Action<bool> setPinned, Action? remove = null, Action? refresh = null, Action? export = null)
     {
-        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(650) };
+        var timer = ScrollGestureGuard.Watch(new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(650) });
         Point origin = new();
         bool held = false;
         int touchId = -1;
@@ -35,10 +35,10 @@ public static class SceneMenu
             }
             menu.IsOpen = true;
         }
-        target.PreviewMouseRightButtonUp += (_, e) => { Open(); e.Handled = true; };
+        target.PreviewMouseRightButtonUp += (_, e) => { if (e.StylusDevice != null) { e.Handled = true; return; } Open(); e.Handled = true; };
         System.Windows.Input.Stylus.SetIsPressAndHoldEnabled(target, false);
-        target.PreviewTouchDown += (_, e) => { timer.Stop(); origin = e.GetTouchPoint(target).Position; touchId = e.TouchDevice.Id; held = false; timer.Start(); };
-        target.PreviewTouchMove += (_, e) => { if (e.TouchDevice.Id == touchId && (e.GetTouchPoint(target).Position - origin).Length > 12) timer.Stop(); };
+        target.PreviewTouchDown += (_, e) => { timer.Stop(); origin = e.GetTouchPoint(Window.GetWindow(target)).Position; touchId = e.TouchDevice.Id; held = false; timer.Start(); };
+        target.PreviewTouchMove += (_, e) => { if (e.TouchDevice.Id == touchId && (e.GetTouchPoint(Window.GetWindow(target)).Position - origin).Length > 8) timer.Stop(); };
         target.PreviewTouchUp += (_, e) => { timer.Stop(); if (held) { e.Handled = true; held = false; } };
         target.PreviewMouseLeftButtonUp += (_, e) => { if (held) { e.Handled = true; held = false; } };
         timer.Tick += (_, _) => { timer.Stop(); held = true; Open(); };

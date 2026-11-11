@@ -104,7 +104,7 @@ public partial class MainWindow
         if (sender is not FrameworkElement button || button.Tag?.ToString() == "ready")
             return;
         button.Tag = "ready";
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(650) };
+        var timer = ScrollGestureGuard.Watch(new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(650) });
         Point origin = new();
         bool pressing = false;
         void Begin(Point point)
@@ -115,10 +115,10 @@ public partial class MainWindow
             timer.Start();
             holdTimer.Stop();
         }
-        button.PreviewMouseLeftButtonDown += (_, args) => { if (args.StylusDevice == null) Begin(args.GetPosition(button)); };
-        button.PreviewTouchDown += (_, args) => Begin(args.GetTouchPoint(button).Position);
-        button.PreviewMouseMove += (_, args) => { if ((args.GetPosition(button) - origin).Length > 12) { timer.Stop(); pressing = false; } };
-        button.PreviewTouchMove += (_, args) => { if ((args.GetTouchPoint(button).Position - origin).Length > 12) { timer.Stop(); pressing = false; } };
+        button.PreviewMouseLeftButtonDown += (_, args) => { if (args.StylusDevice == null) Begin(args.GetPosition(this)); };
+        button.PreviewTouchDown += (_, args) => Begin(args.GetTouchPoint(this).Position);
+        button.PreviewMouseMove += (_, args) => { if ((args.GetPosition(this) - origin).Length > 12) { timer.Stop(); pressing = false; } };
+        button.PreviewTouchMove += (_, args) => { if ((args.GetTouchPoint(this).Position - origin).Length > 12) { timer.Stop(); pressing = false; } };
         button.PreviewMouseLeftButtonUp += (_, _) => { timer.Stop(); pressing = false; };
         button.PreviewTouchUp += (_, _) => { timer.Stop(); pressing = false; };
         button.Unloaded += (_, _) => timer.Stop();
