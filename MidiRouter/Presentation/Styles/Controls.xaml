@@ -1,0 +1,90 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<SolidColorBrush x:Key="Green" Color="#35CB7D"/>
+<Style TargetType="Button">
+ <Setter Property="Foreground" Value="#F5F5F5"/><Setter Property="Background" Value="#262B32"/>
+ <Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="16,10"/>
+ <Setter Property="FontSize" Value="16"/><Setter Property="Cursor" Value="Hand"/>
+ <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+ <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="14" Padding="{TemplateBinding Padding}" BorderThickness="{TemplateBinding BorderThickness}" BorderBrush="{TemplateBinding BorderBrush}"><ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/></Border>
+ <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#323A43"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#30463B"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".4"/></Trigger></ControlTemplate.Triggers>
+ </ControlTemplate></Setter.Value></Setter>
+</Style>
+<Style TargetType="TextBox"><Setter Property="Background" Value="#242424"/><Setter Property="Foreground" Value="White"/><Setter Property="CaretBrush" Value="White"/><Setter Property="BorderBrush" Value="#454545"/><Setter Property="Padding" Value="9"/><Setter Property="FontSize" Value="16"/></Style>
+<Style TargetType="CheckBox"><Setter Property="Foreground" Value="White"/><Setter Property="FontSize" Value="16"/><Setter Property="Margin" Value="0,8"/></Style>
+<Style TargetType="ContextMenu">
+ <Setter Property="LayoutTransform"><Setter.Value><ScaleTransform ScaleX="0.8" ScaleY="0.8"/></Setter.Value></Setter>
+ <Setter Property="Foreground" Value="#EFF2F5"/><Setter Property="Background" Value="#232830"/><Setter Property="FontSize" Value="14"/>
+ <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu"><Border Background="{TemplateBinding Background}" BorderBrush="#414A56" BorderThickness="1" CornerRadius="10" Padding="6"><StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/></Border></ControlTemplate></Setter.Value></Setter>
+</Style>
+<Style TargetType="MenuItem">
+ <Setter Property="Foreground" Value="#EFF2F5"/><Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="12,9"/><Setter Property="MinWidth" Value="170"/>
+ <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem"><Border x:Name="Tile" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ContentPresenter Grid.Column="2" Content="{TemplateBinding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center"/><TextBlock x:Name="Tick" Text="✓" Visibility="Hidden" Foreground="#35CB7D"/><ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True"/></Grid></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Tile" Property="Background" Value="#36414D"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".4"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+</Style>
+<Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="#EFF2F5"/><Setter Property="Background" Value="#262B32"/><Setter Property="Padding" Value="10,7"/></Style>
+<Style TargetType="ComboBox">
+ <Setter Property="Foreground" Value="#EFF2F5"/><Setter Property="Background" Value="#262B32"/><Setter Property="FontSize" Value="14"/>
+ <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox"><Grid>
+ <ToggleButton IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" Focusable="False"><ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="#262B32" BorderBrush="#414A56" BorderThickness="1" CornerRadius="6" Padding="10,9"><TextBlock Text="⌄" HorizontalAlignment="Right" Foreground="#BAC2CD"/></Border></ControlTemplate></ToggleButton.Template></ToggleButton>
+ <ContentPresenter Margin="10,6,28,6" VerticalAlignment="Center" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
+ <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False"><Border Background="#262B32" BorderBrush="#414A56" BorderThickness="1" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" Padding="4"><ScrollViewer MaxHeight="260"><ItemsPresenter/></ScrollViewer></Border></Popup>
+ </Grid></ControlTemplate></Setter.Value></Setter>
+</Style>
+<Style x:Key="SectionTitle" TargetType="TextBlock"><Setter Property="Foreground" Value="#A5B3C2"/><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Margin" Value="0,0,0,12"/></Style>
+<Style x:Key="FieldLabel" TargetType="TextBlock"><Setter Property="Foreground" Value="#BAC2CD"/><Setter Property="FontSize" Value="13"/><Setter Property="Margin" Value="0,0,0,5"/></Style>
+<Style TargetType="TabControl">
+ <Setter Property="Background" Value="#222830"/>
+ <Setter Property="BorderThickness" Value="0"/>
+ <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabControl"><Grid>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+  <TabPanel IsItemsHost="True" Margin="0,0,0,16"/>
+  <ContentPresenter Grid.Row="1" ContentSource="SelectedContent"/>
+ </Grid></ControlTemplate></Setter.Value></Setter>
+</Style>
+<Style TargetType="TabItem">
+ <Setter Property="Foreground" Value="#F5F5F5"/>
+ <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+ <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
+  <Border x:Name="Tab" Background="#222830" Padding="16,10" Margin="0,0,4,0"><ContentPresenter ContentSource="Header"/></Border>
+  <ControlTemplate.Triggers>
+   <Trigger Property="IsSelected" Value="True"><Setter TargetName="Tab" Property="Background" Value="#323A43"/></Trigger>
+   <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Tab" Property="Background" Value="#38414B"/></Trigger>
+  </ControlTemplate.Triggers>
+ </ControlTemplate></Setter.Value></Setter>
+</Style>
+  <Style x:Key="SlimBar" TargetType="ScrollBar">
+   <Setter Property="Width" Value="2.4" />
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar">
+    <Track x:Name="PART_Track" IsDirectionReversed="True" Orientation="Vertical" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}" ViewportSize="{TemplateBinding ViewportSize}">
+     <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False" /></Track.DecreaseRepeatButton>
+     <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="#69737F" Width="2.4" HorizontalAlignment="Right" CornerRadius="1" /></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+     <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False" /></Track.IncreaseRepeatButton>
+    </Track>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="PanelScroll" TargetType="ScrollViewer">
+   <Setter Property="PanningMode" Value="VerticalOnly"/>
+   <Setter Property="PanningRatio" Value="0.45"/>
+   <Setter Property="Stylus.IsPressAndHoldEnabled" Value="False"/>
+   <Setter Property="CanContentScroll" Value="False"/>
+   <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+   <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollViewer">
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="24" /></Grid.ColumnDefinitions>
+     <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Content="{TemplateBinding Content}" CanContentScroll="{TemplateBinding CanContentScroll}" />
+     <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="1" HorizontalAlignment="Right" Style="{StaticResource SlimBar}" Value="{Binding VerticalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}" Maximum="{TemplateBinding ScrollableHeight}" ViewportSize="{TemplateBinding ViewportHeight}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}" />
+    </Grid>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+
+
+<Style TargetType="ScrollViewer" BasedOn="{StaticResource PanelScroll}"/>
+<Style x:Key="SearchBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+ <Setter Property="VerticalContentAlignment" Value="Center"/>
+ <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
+  <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+   <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center"/>
+  </Border>
+ </ControlTemplate></Setter.Value></Setter>
+</Style>
+</ResourceDictionary>

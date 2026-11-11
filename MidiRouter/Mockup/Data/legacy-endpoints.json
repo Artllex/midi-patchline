@@ -1,0 +1,34 @@
+[
+  {
+    "Id": "kobol",
+    "Name": "Kobol",
+    "Group": "RACK",
+    "Port": "OUT 6"
+  },
+  {
+    "Id": "model-d",
+    "Name": "Model D",
+    "Group": "RACK",
+    "Port": "OUT 7"
+  },
+  {
+    "Id": "system-8",
+    "Name": "Roland System-8",
+    "Group": "KEYBOARDS",
+    "Port": "OUT 8"
+  },
+  {
+    "Id": "cz5000",
+    "Name": "Casio CZ-5000",
+    "Group": "KEYBOARDS",
+    "Port": "",
+    "Available": false
+  },
+  {
+    "Id": "neutron",
+    "Name": "Neutron",
+    "Group": "RACK",
+    "Port": "",
+    "Available": false
+  }
+]

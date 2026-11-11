@@ -14,3 +14,6 @@ startup-check-result.txt
 startup-check-error.txt
 .env
 .env.*
+
+settings-check-error.txt
+diagnostic-error.txt

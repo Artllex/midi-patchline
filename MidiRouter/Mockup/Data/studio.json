@@ -1,0 +1,51 @@
+{
+  "Endpoints": [
+    {
+      "Id": "jp",
+      "Name": "JP-8080",
+      "Group": "RACK",
+      "Port": "OUT 1"
+    },
+    {
+      "Id": "virus",
+      "Name": "Virus TI",
+      "Group": "RACK",
+      "Port": "OUT 2"
+    },
+    {
+      "Id": "nord",
+      "Name": "Nord Rack",
+      "Group": "RACK",
+      "Port": "OUT 3",
+      "Available": false
+    },
+    {
+      "Id": "roland",
+      "Name": "Roland JD-800",
+      "Group": "KEYBOARDS",
+      "Port": "OUT 4"
+    },
+    {
+      "Id": "top",
+      "Name": "Pozostałe instrumenty",
+      "Group": "ON TOP",
+      "Port": "OUT 5"
+    }
+  ],
+  "Cards": [
+    {
+      "Id": "studio",
+      "Name": "Studio",
+      "Routes": [
+        {
+          "SourceId": "a",
+          "ReceiverId": "jp"
+        },
+        {
+          "SourceId": "a",
+          "ReceiverId": "virus"
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net6.0-windows</TargetFramework>
@@ -11,76 +11,13 @@
     <Title>MIDI Patchline</Title>
     <Description>Routing MIDI i presety studia</Description>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>0.1.104</Version>
+    <Version>0.1.122</Version>
     <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
-  <ItemGroup><Resource Include="Assets\*.png"/></ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\*.png" />
+    <EmbeddedResource Include="Resources\Localization\Translations.*.json"
+                      LogicalName="MidiPatchline.%(Filename)%(Extension)" WithCulture="false" />
+    <EmbeddedResource Include="Mockup\Data\*.json" LogicalName="MidiPatchline.Mockup.%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

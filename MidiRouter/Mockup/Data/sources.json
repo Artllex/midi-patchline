@@ -1,0 +1,66 @@
+[
+  {
+    "Id": "a",
+    "Name": "ROLI Seaboard 2",
+    "Tags": [
+      "Klawiatury"
+    ],
+    "Details": {
+      "Type": "Klawiatura",
+      "KeyCount": 49
+    },
+    "ImagePath": "pack://application:,,,/Assets/roli.png"
+  },
+  {
+    "Id": "b",
+    "Name": "Nektar Impact GXP61",
+    "Tags": [
+      "Klawiatury"
+    ],
+    "Details": {
+      "Type": "Klawiatura",
+      "KeyCount": 61
+    },
+    "ImagePath": "pack://application:,,,/Assets/nektar.png"
+  },
+  {
+    "Id": "other",
+    "Name": "Źródło 3"
+  },
+  {
+    "Id": "extra4",
+    "Name": "Źródło 4"
+  },
+  {
+    "Id": "extra5",
+    "Name": "Źródło 5"
+  },
+  {
+    "Id": "extra6",
+    "Name": "Źródło 6"
+  },
+  {
+    "Id": "extra7",
+    "Name": "Źródło 7"
+  },
+  {
+    "Id": "extra8",
+    "Name": "Źródło 8"
+  },
+  {
+    "Id": "extra9",
+    "Name": "Źródło 9"
+  },
+  {
+    "Id": "extra10",
+    "Name": "Źródło 10"
+  },
+  {
+    "Id": "extra11",
+    "Name": "Źródło 11"
+  },
+  {
+    "Id": "extra12",
+    "Name": "Źródło 12"
+  }
+]
